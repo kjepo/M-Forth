@@ -12,7 +12,7 @@ First we need to look at the data structure for word definitions.
 Let's look at a simple example:
 <pre>
 : DOUBLE DUP PLUS ;
-: QUADRULE DOUBLE DOUBLE ;
+: QUADRUPLE DOUBLE DOUBLE ;
 </pre>
 
 <img src="http://beta.rad.pub/ftp/m1.png">
