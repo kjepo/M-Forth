@@ -262,7 +262,15 @@ return_stack_top:
         CSETM   X0, EQ
 	PUSH	X0
 	NEXT
-	
+
+	DEFCODE	"<>",1,,NEQ	// ( a b -- a ) top two words not equal?
+	POP	X0
+	POP	X1
+	CMP	X0, X1
+	CSETM	X0, NE
+	PUSH	X0
+	NEXT
+
 	.data
 	.align	4
 MTEST:
@@ -303,7 +311,8 @@ MTEST5:
 	.quad	3
 	.quad 	DOLIT
 	.quad	3
-	.quad	EQU
+	.quad	NEQ
 	.quad 	DOT
 	.quad	HALT
 	.quad	EXIT
+
