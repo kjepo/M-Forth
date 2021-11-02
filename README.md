@@ -6,10 +6,10 @@ M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 
 Forth <i>words</i> are akin to subroutines in other programming languages.
 Words can be either <i>primitive</i>, i.e., written in assembly language,
-or defined in terms of other words.  The syntax for defining new words is
+or defined in terms of other words.  The syntax for defining a new word is
 <p>
 <tt>:</tt> <i>wordname</i> <i>word</i><sub>1</sub> <i>word</i><sub>2</sub>
-	   &ellips; <i>word</n><sub>1</sub> <tt>;</tt>
+	   &ellips; <i>word</n><sub>n</sub> <tt>;</tt>
 </p>
 
 
