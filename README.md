@@ -1,8 +1,10 @@
 # M-Forth
 
+## Abstract
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 
-<b>Note:</b> This document will not explain FORTH in detail
+## Introduction and background
+This document will not explain FORTH in detail
 &mdash; there are plenty of resources for that.
 Rather, we will just cover the salient features of the language,
 in order to understand the implementation.
@@ -41,13 +43,14 @@ In a working FORTH system, we could then continue and enter
 and the system would reply <tt>168</tt>.
 FORTH programmers can enjoy identifiers with pretty much any character (but not space),
 so <tt>.</tt> is another primitive which removes and prints out the top stack element.
+<p>
 
-
+## Representing words
 
 M-Forth uses "Indirect Threading".  In the first stage we write the so called
 "inner interpreter" which can execute words but does not handle user input,
 i.e., all words (primitive or not) must be defined in the assembler file.
-
+</p>
 First we need to look at the data structure for word definitions.
 Let's look at the previous example:
 <pre>
