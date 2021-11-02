@@ -11,7 +11,14 @@ or defined in terms of other words.  The syntax for defining a new word is
 <tt>:</tt> <i>word</i> <i>word</i><sub>1</sub> <i>word</i><sub>2</sub>
 	   &hellip; <i>word</n><sub>n</sub> <tt>;</tt>
 </p>
-
+which is equivalent to
+<p>
+<i>word</i>() { <tt>call</tt> <i>word</i><sub>1</sub>();
+	        <tt>call</tt> <i>word</i><sub>2</sub>();
+		&hellip;
+	        <tt>call</tt> <i>word</i><sub>n</sub>(); }
+</p>
+in a traditional programming language. 
 
 
 M-Forth uses "Indirect Threading".  In the first stage we write the so called
