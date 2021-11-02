@@ -13,7 +13,7 @@ or defined in terms of other words.  The syntax for defining a new word is
 </p>
 which is equivalent to
 <p>
-<i>word</i>() { <tt>call</tt> <i>word</i><sub>1</sub>();
+<tt>procedure</tt><i>word</i>() { <tt>call</tt> <i>word</i><sub>1</sub>();
 	        <tt>call</tt> <i>word</i><sub>2</sub>();
 		&hellip;
 	        <tt>call</tt> <i>word</i><sub>n</sub>(); }
