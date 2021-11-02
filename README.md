@@ -16,7 +16,7 @@ Let's look at a simple example:
 : QUADRUPLE DOUBLE DOUBLE ;
 </pre>
 
-<img src="http://beta.rad.pub/ftp/m1.png">
+<img src="http://beta.rad.pub/ftp/m2.png">
 
 In this figure, gray cells denote the so called "codewords" which contains
 a pointer to a piece of code that handles the word.  What is meant by
