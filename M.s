@@ -82,7 +82,7 @@
 	.align 4			// MacOS
 _main:	
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST3
+	KLOAD	X8, MTEST5
 	NEXT				// won't return
 	
 DOCOL:
@@ -247,7 +247,22 @@ return_stack_top:
 	DEFWORD "TRIPLE",6,,TRIPLE	// ( n -- n)
 	.quad 	DUP,DUP,PLUS,PLUS,EXIT
 
+	DEFWORD "QUADRUPLE",9,,QUADRUPLE
+	.quad	DOUBLE,DOUBLE,EXIT
+	
+//	ANS FORTH says that the comparison words should return -1 for TRUE and 0 for FALSE
+//	Jones Forth uses the C programming convention 1 for TRUE and 0 for FALSE.
+//	Here, I'm using the ANS FORTH convention but if you prefer Jones Forth way of doing it, 
+//	replace CSETM with CSET below.
 
+	DEFCODE	"=",1,,EQU	// ( a b -- a ) top two words are equal?
+	POP	X0
+	POP	X1
+	CMP     X0, X1
+        CSETM   X0, EQ
+	PUSH	X0
+	NEXT
+	
 	.data
 	.align	4
 MTEST:
@@ -274,4 +289,21 @@ MTEST3:
 	.quad 	DOT		
 	.quad 	HALT
 	.quad 	EXIT		
-	
+
+MTEST4:
+	.quad 	DOLIT
+	.quad	3
+	.quad 	QUADRUPLE
+	.quad 	DOT
+	.quad	HALT
+	.quad	EXIT
+
+MTEST5:
+	.quad 	DOLIT
+	.quad	3
+	.quad 	DOLIT
+	.quad	3
+	.quad	EQU
+	.quad 	DOT
+	.quad	HALT
+	.quad	EXIT
