@@ -12,9 +12,11 @@ Words can be either <i>primitive</i>, i.e., written in assembly language,
 or defined in terms of other words.  The syntax for defining a new word is
 <p>
 <tt>:</tt> <i>word</i> <i>word</i><sub>1</sub> <i>word</i><sub>2</sub>
-	   &hellip; <i>word</n><sub>n</sub> <tt>;</tt>
+	   &hellip; <i>word</i><sub>n</sub> <tt>;</tt>
 </p>
+<p>
 which is equivalent to
+</p>
 <p>
 <tt>procedure</tt><i>word</i>() { <tt>call</tt> <i>word</i><sub>1</sub>();
 	        <tt>call</tt> <i>word</i><sub>2</sub>();
