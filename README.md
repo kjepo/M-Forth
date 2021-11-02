@@ -18,4 +18,8 @@ Let's look at a simple example:
 
 <img src="http://beta.rad.pub/ftp/m1.png">
 
+In this figure, gray cells denote the so called "codewords" which contains
+a pointer to a piece of code that handles the word.  What is meant by
+"handling" the word depends on the word being a primitive (written in assembler)
+or not (consisting of links to other words).
 
