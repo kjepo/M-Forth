@@ -48,16 +48,21 @@ so <tt>.</tt> is another primitive which removes and prints out the top stack el
 </p>
 
 ## The inner interpreter
-
+<p>
 As we've seen, FORTH words can be either primitives &mdash; consisting entirely
-of assembly language snippets &mdash; or user-defined &mdash; referencing a list
-of previously defined words (which, in themselves, reference other words).
+of assembly language snippets &mdash; or user-defined, referencing a list
+of previously defined words (which, in themselves, reference other words, etc,
+until they ultimately referene a primitive).
+</p>
+<p>
 We will define the inner interpreter &mdash; the core of the FORTH system.
 To execute a primitive word is obvious: simply call the assembly code.
 But in order to execute a user-defined word, we must potentially invoke the
 interpreter recursively.  For instance, when executing <tt>QUADRUPLE</tt>
 we must (twice) execute the word <tt>DOUBLE</tt> which, in itself, must
 execute <tt>DUP</tt> and <tt>PLUS</tt>.
+</p>
+<p>
 In a higher-level language, the interpreter could probably be expressed
 recursively but here we must create a tight and fast interpreter in
 assembly language.  It is therefore necessary for the interpreter
@@ -67,11 +72,12 @@ More specifically, when we execute the body of <tt>QUADRUPLE</tt> we first
 encounter <tt>DOUBLE</tt> so before calling the interpreter again with
 <tt>DOUBLE</tt> we save the location of where we must continue when we
 are done (which, incidentally, is another call to <tt>DOUBLE</tt>).
-
-
+</p>
+<p>
 M-Forth uses "Indirect Threading".  In the first stage we write the so called
 "inner interpreter" which can execute words but does not handle user input,
 i.e., all words (primitive or not) must be defined in the assembler file.
+</p>
 </p>
 First we need to look at the data structure for word definitions.
 Let's look at the previous example:
