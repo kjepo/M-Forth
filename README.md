@@ -2,7 +2,10 @@
 
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 
-<b>Note:</b> This document will not explain FORTH, there are plenty of resources for that.
+<b>Note:</b> This document will not explain FORTH in detail
+&mdash; there are plenty of resources for that.
+Rather, we will just cover the salient features of the language,
+in order to understand the implementation.
 
 Forth <i>words</i> are akin to subroutines in other programming languages.
 Words can be either <i>primitive</i>, i.e., written in assembly language,
@@ -18,7 +21,25 @@ which is equivalent to
 		&hellip;
 	        <tt>call</tt> <i>word</i><sub>n</sub>(); }
 </p>
-in a traditional programming language. 
+in a traditional programming language.
+Notice that in Forth, arguments to the new word are not named.
+Instead, they are assumed to appear on a <i>stack</i>.
+As an example, let's look at the following definitions:
+<pre>
+: DOUBLE DUP PLUS ;
+: QUADRUPLE DOUBLE DOUBLE ;
+</pre>
+Here, we define two new words &mdash; <tt>DOUBLE</tt> and <tt>QUADRUPLE</tt>
+&mdash; using the primitives <tt>DUP</tt> and <tt>PLUS</tt>.
+(The primitive <tt>DUP</tt> duplicates the top element of the stack.)
+In a working FORTH system, we could then continue and enter
+<pre>
+42 QUADRUPLE .
+</pre>
+and the system would reply <tt>168</tt>.
+FORTH programmers can enjoy identifiers with pretty much any character (but not space),
+so <tt>.</tt> is another primitive which removes and prints out the top stack element.
+
 
 
 M-Forth uses "Indirect Threading".  In the first stage we write the so called
@@ -26,7 +47,7 @@ M-Forth uses "Indirect Threading".  In the first stage we write the so called
 i.e., all words (primitive or not) must be defined in the assembler file.
 
 First we need to look at the data structure for word definitions.
-Let's look at a simple example:
+Let's look at the previous example:
 <pre>
 : DOUBLE DUP PLUS ;
 : QUADRUPLE DOUBLE DOUBLE ;
