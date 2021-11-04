@@ -153,23 +153,6 @@ code_\label :				// assembler code follows
 
 // Help assembler routines	
 
-printnl:
-	// printnl -- print newline character
-	// Note: printnl is a leaf function, no need to save LR
-	PUSH	X0
-	PUSH	X1
-	PUSH	X2
-	PUSH	LR
-	MOV 	X0, #1			// 1 = stdout
-	KLOAD 	X1, newline		// string to print
-	MOV   	X2, #1	 		// length of our string
-	MOV   	X16, #4      		// MacOS write system call
-	SVC   	0     	 		// Output the string
-	POP	LR
-	POP	X2
-	POP	X1
-	POP	X0
-	RET
 
 printhex:	
 	// printhex -- print reg X0 as 16 char hex string 000000000000002A
@@ -227,8 +210,6 @@ hexchars:
 	.data
 hexbuf:
 	.ascii  "0000000000000000"
-newline:
-	.ascii	"\n"
 	
 	.align 4			// FIXME: Align to page size (4096 doesn't work)
 return_stack:	
@@ -279,7 +260,7 @@ buffer:
 	DEFCODE ".",1,,DOT		// ( a -- )
 	POP	X0
 	BL	printhex
-	BL	printnl
+	BL	_CR
 	NEXT
 
 	// special form: push next word as constant
@@ -350,7 +331,6 @@ buffer:
 	    bufftop = n + buffer;
 	    goto l1;
 	}
-
 */
 
 	DEFCODE "KEY",3,,KEY	// ( -- a ) read next byte from stdin and push it on the stack
@@ -358,27 +338,18 @@ buffer:
 	PUSH 	X0		// push return value on stack
 	NEXT
 _KEY:
-	PUSH	X1
-	PUSH	X2
-	PUSH	X3
-	PUSH	X4
-	PUSH	LR
+1:	
 	KLOAD	X1, currkey
 	LDR	X2, [X1]	// X2 = currkey
 	KLOAD	X3, bufftop
 	LDR	X4, [X3]	// X4 = bufftop
 	CMP	X2, X4		// currkey == bufftop ?
-	B.GE	1f		// exhausted the input buffer?
+	B.GE	2f		// exhausted the input buffer?
 	MOV	X0, #0	
 	LDRB	W0, [X2], #1	// W0 = *currkey++
 	STR	X2, [X1]
-	POP	LR
-	POP	X4
-	POP	X3
-	POP	X2
-	POP	X1
 	RET
-1:	
+2:	
 	// Out of input; use read(2) to fetch more input from stdin.
 	MOV	W0, 0		// stdin
 	KLOAD	X1, buffer
@@ -393,7 +364,7 @@ _KEY:
 	ADD	X0, X0, X1	// bufftop = X0 + buffer
 	KLOAD	X2, bufftop
 	STR	X0, [X2]
-	B	_KEY
+	B	1b
 
 	.data
 	.align 4
@@ -402,9 +373,8 @@ currkey:
 bufftop:
 	.quad	buffer		// Last valid data in input buffer + 1.
 
-	/* WORD reads the next the full word of input */
+	/* WORD reads the next the full word of input 
 
-	/* 
 	char word_buffer[32];
 
 	char *word(int *len) {                                
@@ -442,10 +412,11 @@ _WORD:
 	KLOAD	X2, word_buffer
 2:
 	STRB	W0, [X2], #1	// *word_buffer++ = W0
+	PUSH	X2
 	BL	_KEY
+	POP	X2
 	CMP	X0, ' '
 	B.NE	2b
-_WORD2:	
 	KLOAD	X1, word_buffer
 	SUB	X0, X2, X1
 	POP	LR
@@ -460,9 +431,6 @@ _WORD2:
 word_buffer:
 	//	.space	32
 	.ascii 	"01234567890123456789012345678901"
-	
-
-
 
 	DEFCODE "EMIT",4,,EMIT	// ( a -- )  emit top of stack as ASCII
 	POP 	X0
@@ -479,6 +447,27 @@ _EMIT:
 	.data			// NB: easier to fit in the .data section
 emit_buf:
 	.space 1		// buffer used by EMIT
+	
+	// fixme: rewrite this as DEFWORD using DOLIT 10 EMIT
+	DEFCODE	"CR",2,,CR	// ( -- ) emits a carriage return
+	BL	_CR
+	NEXT
+_CR:
+	PUSH	X0
+	PUSH	X1
+	PUSH	X2
+	MOV 	X0, #1			// 1 = stdout
+	KLOAD 	X1, newline		// string to print
+	MOV   	X2, #1	 		// length of our string
+	MOV   	X16, #4      		// MacOS write system call
+	SVC   	0     	 		// Output the string
+	POP	X2
+	POP	X1
+	POP	X0
+	RET
+	.data
+newline:
+	.ascii	"\n"
 	
 	DEFCODE "EMITWORD",8,,EMITWORD	// ( a n -- )  emit n characters from string buffer a
 	POP	X2		// length
@@ -557,12 +546,19 @@ MTEST7:
 	.quad	EMIT
 	.quad 	KEY // 6
 	.quad	EMIT
-	
 	.quad	HALT
 	.quad	EXIT
 
 MTEST8:
 	.quad	WORD
 	.quad	EMITWORD
+	.quad	DOLIT
+	.quad	10
+	.quad	EMIT
+	.quad	WORD
+	.quad	EMITWORD
+	.quad	DOLIT
+	.quad	10
+	.quad	EMIT
 	.quad	HALT
 	.quad	EXIT
