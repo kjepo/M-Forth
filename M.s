@@ -48,6 +48,11 @@
 // a 32-bit FORTH by sticking to one 32-bit address space, but 
 // this is not something I have investigated.	
 
+// footnote: this is how cc compiles it:
+//	adrp	x19, _buffer@GOTPAGE
+//	ldr	x19, [x19, _buffer@GOTPAGEOFF]
+
+
 .macro 	KLOAD register, addr			
 	ADRP \register, \addr@PAGE		
 	ADD \register, \register, \addr@PAGEOFF 
@@ -86,10 +91,9 @@ _main:
 	STR	X0, [X1]
 	KLOAD	X3, bufftop
 	STR	X0, [X3]
-	
 
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST7
+	KLOAD	X8, MTEST8
 	NEXT				// won't return
 	
 DOCOL:
@@ -152,11 +156,19 @@ code_\label :				// assembler code follows
 printnl:
 	// printnl -- print newline character
 	// Note: printnl is a leaf function, no need to save LR
+	PUSH	X0
+	PUSH	X1
+	PUSH	X2
+	PUSH	LR
 	MOV 	X0, #1			// 1 = stdout
 	KLOAD 	X1, newline		// string to print
 	MOV   	X2, #1	 		// length of our string
 	MOV   	X16, #4      		// MacOS write system call
 	SVC   	0     	 		// Output the string
+	POP	LR
+	POP	X2
+	POP	X1
+	POP	X0
 	RET
 
 printhex:	
@@ -169,6 +181,13 @@ printhex:
 	// Note 1: W2 is the lower 32-bit word of 64-bit register X2
 	// Note 2: printhex is a leaf function, no need to save LR
 	
+	PUSH	LR
+	PUSH	X1
+	PUSH	X2
+	PUSH	X3
+	PUSH	X4
+	PUSH	X5
+
 	KLOAD 	X1, hexbuf		// X1 = &hexbuf
 	ADD   	X1, X1, #15		// X1 = X1 + 15 (length of hexbuf)
 	MOV   	W5, #16			// loop counter: 16 characters to print
@@ -188,6 +207,13 @@ printhex1:
 	MOV   	X2, #16	 		// length of our string
 	MOV   	X16, #4      		// MacOS write system call
 	SVC   	0     	 		// Output the string
+	
+	POP	X5
+	POP	X4
+	POP	X3
+	POP	X2
+	POP	X1
+	POP	LR
 	
 	RET
 
@@ -301,11 +327,42 @@ buffer:
 // 	I/O
 //--------------------------------------------------	
 	
-	DEFCODE "KEY",3,,KEY
+/*	
+	KEY reads the next byte from stdin and pushes it on the stack.
+	It uses a buffer and two pointers, buffer and bufftop.
+
+	#define BUFFER_SIZE 4096
+	char buffer[BUFFER_SIZE];
+	char *bufftop = buffer; 
+	char *currkey = buffer;
+
+	char key() {
+	    int n;	
+	l1:
+	    if (currkey >= bufftop)
+	        goto l2;
+	    return *currkey++;
+	l2:
+	    n = read(0, buffer, BUFFER_SIZE);
+	    if (n <= 0)
+		exit(0);
+	    currkey = buffer;
+	    bufftop = n + buffer;
+	    goto l1;
+	}
+
+*/
+
+	DEFCODE "KEY",3,,KEY	// ( -- a ) read next byte from stdin and push it on the stack
 	BL	_KEY
 	PUSH 	X0		// push return value on stack
 	NEXT
 _KEY:
+	PUSH	X1
+	PUSH	X2
+	PUSH	X3
+	PUSH	X4
+	PUSH	LR
 	KLOAD	X1, currkey
 	LDR	X2, [X1]	// X2 = currkey
 	KLOAD	X3, bufftop
@@ -314,11 +371,16 @@ _KEY:
 	B.GE	1f		// exhausted the input buffer?
 	MOV	X0, #0	
 	LDRB	W0, [X2], #1	// W0 = *currkey++
-	STR	X2, [X1]	
+	STR	X2, [X1]
+	POP	LR
+	POP	X4
+	POP	X3
+	POP	X2
+	POP	X1
 	RET
 1:	
 	// Out of input; use read(2) to fetch more input from stdin.
-	MOV	X0, 0		// stdin
+	MOV	W0, 0		// stdin
 	KLOAD	X1, buffer
 	KLOAD	X2, currkey	
 	STR	X1, [X2]	// currkey = buffer
@@ -340,6 +402,66 @@ currkey:
 bufftop:
 	.quad	buffer		// Last valid data in input buffer + 1.
 
+	/* WORD reads the next the full word of input */
+
+	/* 
+	char word_buffer[32];
+
+	char *word(int *len) {                                
+	    char c;
+	    char *p = word_buffer;
+	l1:
+	    c = key();
+	    if (c == '\\') goto l3;
+	    if (c == ' ') goto l1;
+	l2:
+	    *p++ = c;
+	    c = key();
+	    if (c != ' ') goto l2;
+	    *len = p - word_buffer;
+	    return word_buffer;
+	l3:
+	    if (key() != '\n') goto l3;
+	    goto l1;
+	} 
+        */
+
+	DEFCODE "WORD",4,,WORD
+	BL	_WORD
+	PUSH	X1	// push base address
+	PUSH	X0	// push length
+	NEXT
+_WORD:
+	PUSH	LR
+1:	
+	BL	_KEY		// read next char into X0
+	CMP	X0, '\\'
+	B.EQ	3f
+	CMP	X0, ' '
+	B.EQ	1b
+	KLOAD	X2, word_buffer
+2:
+	STRB	W0, [X2], #1	// *word_buffer++ = W0
+	BL	_KEY
+	CMP	X0, ' '
+	B.NE	2b
+_WORD2:	
+	KLOAD	X1, word_buffer
+	SUB	X0, X2, X1
+	POP	LR
+	RET
+3:				// consume comment until EOL
+	BL	_KEY
+	CMP	X0, '\n'
+	B.NE	3b
+	B	1b
+
+	.data
+word_buffer:
+	//	.space	32
+	.ascii 	"01234567890123456789012345678901"
+	
+
 
 
 	DEFCODE "EMIT",4,,EMIT	// ( a -- )  emit top of stack as ASCII
@@ -351,12 +473,24 @@ _EMIT:
 	STR	W0, [X1]	// store character
 	MOV	X0, #1		// 1 = stdout
 	MOV	X2, #1		// length of our string
-	MOV   	X16, #4      		// MacOS write system call
+	MOV   	X16, #4		// MacOS write system call
 	SVC	0
 	RET
 	.data			// NB: easier to fit in the .data section
 emit_buf:
 	.space 1		// buffer used by EMIT
+	
+	DEFCODE "EMITWORD",8,,EMITWORD	// ( a n -- )  emit n characters from string buffer a
+	POP	X2		// length
+	POP	X1		// start
+	BL 	_EMITWORD
+	NEXT
+	// upon entering: X1 = buffer, X2 = length
+_EMITWORD:
+	MOV	X0, #1		// 1 = stdout
+	MOV	X16, #4
+	SVC 	0
+	RET
 
 	.data
 	.align	4
@@ -417,6 +551,18 @@ MTEST7:
 	.quad	EMIT
 	.quad 	KEY // 3
 	.quad	EMIT
+	.quad 	KEY // 4
+	.quad	EMIT
+	.quad 	KEY // 5
+	.quad	EMIT
+	.quad 	KEY // 6
+	.quad	EMIT
 	
+	.quad	HALT
+	.quad	EXIT
+
+MTEST8:
+	.quad	WORD
+	.quad	EMITWORD
 	.quad	HALT
 	.quad	EXIT
