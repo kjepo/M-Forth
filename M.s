@@ -80,9 +80,16 @@
 .endm
 	.global _main          		// Provide program starting address to linker
 	.align 4			// MacOS
-_main:	
+_main:
+	KLOAD 	X0, buffer
+	KLOAD	X1, currkey
+	STR	X0, [X1]
+	KLOAD	X3, bufftop
+	STR	X0, [X3]
+	
+
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST5
+	KLOAD	X8, MTEST7
 	NEXT				// won't return
 	
 DOCOL:
@@ -90,26 +97,29 @@ DOCOL:
 	ADD	X8, X0, #8	
 	NEXT
 	
+	.set	RETURN_STACK_SIZE,8192	// allocate static buffer for return stack
+	.set	BUFFER_SIZE,4096	// and input buffer (when reading files/text)
+
 	.set 	F_IMMED,0x80		// three masks for the length field [*] below
 	.set 	F_HIDDEN,0x20
 	.set 	F_LENMASK,0x1f		// length mask
-	.set	link, 0
-	
-.macro 	DEFWORD name, namelen, flags=0, label
-	.data
-	.align 	4
-	.globl 	name_\label
+        .set    link, 0
+        
+.macro  DEFWORD name, namelen, flags=0, label
+        .data
+        .align  4
+        .globl  name_\label
 name_\label :
-	.quad 	link\@	
-	.set 	link\@, name_\label
-	.byte 	\flags+\namelen		// flags + length byte [*]
-	.ascii 	"\name"			// the name
-	.align 	4			// padding to next 4 byte boundary
-	.globl 	\label
+        .quad   link\@  
+        .set    link\@, name_\label
+        .byte   \flags+\namelen         // flags + length byte [*]
+        .ascii  "\name"                 // the name
+        .align  4                       // padding to next 4 byte boundary
+        .globl  \label
 \label :
-	.quad 	DOCOL			// codeword - the interpreter
-	// list of word pointers follow
-	.endm
+        .quad   DOCOL                   // codeword - the interpreter
+        // list of word pointers follow
+        .endm
 
 .macro 	DEFCODE name, namelen, flags=0, label
 	.data
@@ -128,6 +138,14 @@ name_\label :
 	.globl 	code_\label
 code_\label :				// assembler code follows
 	.endm
+	
+.macro	DEFCONST name, namelen, flags=0, label, value
+	DEFCODE  \name,\namelen,\flags,\label
+	KLOAD	 X0, \value
+	PUSH	 X0
+	NEXT
+	.endm
+	
 
 // Help assembler routines	
 
@@ -188,12 +206,20 @@ newline:
 	
 	.align 4			// FIXME: Align to page size (4096 doesn't work)
 return_stack:	
-	.space 8192			// Allocate 8K memory for the return stack
+	.space RETURN_STACK_SIZE	// Allocate static memory for the return stack
 return_stack_top:
+
+	// This is used as a temporary input buffer when reading from files or the terminal
+	.align 4
+buffer:
+	.space BUFFER_SIZE
+	
 
 // --------------------------
 // Primitive Word Definitions
 // --------------------------
+	
+	DEFCONST "R0",2,,RZ,return_stack_top
 
 	DEFCODE	"EXIT",4,,EXIT		
 	POPRSP	X8
@@ -271,6 +297,67 @@ return_stack_top:
 	PUSH	X0
 	NEXT
 
+//--------------------------------------------------	
+// 	I/O
+//--------------------------------------------------	
+	
+	DEFCODE "KEY",3,,KEY
+	BL	_KEY
+	PUSH 	X0		// push return value on stack
+	NEXT
+_KEY:
+	KLOAD	X1, currkey
+	LDR	X2, [X1]	// X2 = currkey
+	KLOAD	X3, bufftop
+	LDR	X4, [X3]	// X4 = bufftop
+	CMP	X2, X4		// currkey == bufftop ?
+	B.GE	1f		// exhausted the input buffer?
+	MOV	X0, #0	
+	LDRB	W0, [X2], #1	// W0 = *currkey++
+	STR	X2, [X1]	
+	RET
+1:	
+	// Out of input; use read(2) to fetch more input from stdin.
+	MOV	X0, 0		// stdin
+	KLOAD	X1, buffer
+	KLOAD	X2, currkey	
+	STR	X1, [X2]	// currkey = buffer
+	MOV	X2, BUFFER_SIZE
+	MOV	X16, #3		// MacOS read system call
+	SVC	0
+	CMP	W0, 0		// returns with number of chars read
+	B.LE	sysexit		// <= 0 means EOF or error, so exit
+	KLOAD	X1, buffer	
+	ADD	X0, X0, X1	// bufftop = X0 + buffer
+	KLOAD	X2, bufftop
+	STR	X0, [X2]
+	B	_KEY
+
+	.data
+	.align 4
+currkey:
+	.quad 	buffer		// Current place in input buffer (next character to read).
+bufftop:
+	.quad	buffer		// Last valid data in input buffer + 1.
+
+
+
+	DEFCODE "EMIT",4,,EMIT	// ( a -- )  emit top of stack as ASCII
+	POP 	X0
+	BL 	_EMIT
+	NEXT
+_EMIT:
+	KLOAD	X1, emit_buf	// string to print
+	STR	W0, [X1]	// store character
+	MOV	X0, #1		// 1 = stdout
+	MOV	X2, #1		// length of our string
+	MOV   	X16, #4      		// MacOS write system call
+	SVC	0
+	RET
+	.data			// NB: easier to fit in the .data section
+emit_buf:
+	.space 1		// buffer used by EMIT
+
 	.data
 	.align	4
 MTEST:
@@ -316,3 +403,20 @@ MTEST5:
 	.quad	HALT
 	.quad	EXIT
 
+MTEST6:
+	.quad 	DOLIT
+	.quad	65
+	.quad 	EMIT
+	.quad	HALT
+	.quad	EXIT
+	
+MTEST7:
+	.quad 	KEY // 1
+	.quad	EMIT
+	.quad 	KEY // 2
+	.quad	EMIT
+	.quad 	KEY // 3
+	.quad	EMIT
+	
+	.quad	HALT
+	.quad	EXIT
