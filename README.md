@@ -52,18 +52,19 @@ so <tt>.</tt> is another primitive which removes and prints out the top stack el
 As we've seen, FORTH words can be either primitives &mdash; consisting entirely
 of assembly language snippets &mdash; or user-defined, referencing a list
 of previously defined words (which, in themselves, reference other words, etc,
-until they ultimately referene a primitive).
+until they ultimately reference a primitive).
 </p>
 <p>
 We will define the inner interpreter &mdash; the core of the FORTH system.
-To execute a primitive word is obvious: simply call the assembly code.
+To execute a primitive word like <tt>DUP</tt> or <tt>PLUS</tt> is obvious:
+simply call the assembly code.
 But in order to execute a user-defined word, we must potentially invoke the
 interpreter recursively.  For instance, when executing <tt>QUADRUPLE</tt>
 we must (twice) execute the word <tt>DOUBLE</tt> which, in itself, must
 execute <tt>DUP</tt> and <tt>PLUS</tt>.
 </p>
 <p>
-In a higher-level language, the interpreter could probably be expressed
+In a higher-level language, the interpreter could be expressed
 recursively but here we must create a tight and fast interpreter in
 assembly language.  It is therefore necessary for the interpreter
 to maintain another stack to remember the location before going off
@@ -78,15 +79,16 @@ M-Forth uses "Indirect Threading".  In the first stage we write the so called
 "inner interpreter" which can execute words but does not handle user input,
 i.e., all words (primitive or not) must be defined in the assembler file.
 </p>
-</p>
+<p>
 First we need to look at the data structure for word definitions.
 Let's look at the previous example:
+</p>
 <pre>
 : DOUBLE DUP PLUS ;
 : QUADRUPLE DOUBLE DOUBLE ;
 </pre>
 
-<img src="http://beta.rad.pub/ftp/m2.png">
+<img src="http://beta.rad.pub/ftp/m3.png">
 
 In this figure, gray cells denote the so called "codewords" which contains
 a pointer to a piece of code that handles the word.  What is meant by
