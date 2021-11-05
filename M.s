@@ -147,7 +147,7 @@ code_\label :				// assembler code follows
 .macro 	DEFVAR 	name, namelen, flags=0, label, initial=0
 	DEFCODE \name,\namelen,\flags,\label
 	KLOAD	X0, var_\name
-	PUSHRSP	X0
+	PUSH	X0
 	NEXT
 	.data
 	.align 	4
@@ -155,8 +155,8 @@ var_\name :
 	.quad	\initial
 	.endm
 	
-	//	DEFVAR "BASE",4,,BASE,10
-var_BASE:	.quad 10
+	DEFVAR "BASE",4,,BASE,10		// fixme: bus error
+//var_BASE:	.quad 16
 
 // Help assembler routines	
 
@@ -257,6 +257,10 @@ buffer:
 	DEFCODE "PUSH27",6,,PUSH27	// ( -- a )
 	MOV	X0, #27
 	PUSH	X0
+	NEXT
+
+	DEFCODE "DROP",4,,DROP
+	POP	X0
 	NEXT
 
 	DEFCODE ".",1,,DOT		// ( a -- )
@@ -441,6 +445,7 @@ word_buffer:
 
 	// ( addr length -- n e ) convert string -> number
 	// n: parsed number, e: number of unparsed characters	
+	// fixme: "1a" is not same as "1A" - perhaps leaves unparsed characters?
 	DEFCODE "NUMBER",6,,NUMBER	
 	POP	X1                      // length
 	POP	X0			// string address
@@ -455,7 +460,7 @@ _NUMBER:
 	CMP	X1, #0
 	B.LE	5f			// error if length <= 0
 	KLOAD	X3, var_BASE
-	LDR	X3, [X3]
+	LDR	X3, [X3]		// X3 = BASE
 	LDRB	W4, [X2], #1		// load first char
 	MOV	X5, #0
 	CMP	X4, '-'
@@ -488,8 +493,9 @@ _NUMBER:
 	CMP	X1, #0
 	B.GT 	1b			// continue processing while there are characters
 4:
-	CMP	X5, #1
-//	NEG	X0, X0			// fixme: negate if...
+	CMP	X5, #1			// number is negative if X5==1
+	B.NE	5f
+	NEG	X0, X0			
 5:
 	POP	LR
 	RET
@@ -629,8 +635,12 @@ MTEST8:
 MTEST9:
 	.quad	WORD
 	.quad	NUMBER
+	.quad	DROP
+	.quad	WORD
+	.quad	NUMBER
+	.quad	DROP
+	.quad 	PLUS
 	.quad	DOT
-	.quad 	DOT
 	.quad	HALT
 	.quad	EXIT
 	
