@@ -86,14 +86,8 @@
 	.global _main          		// Provide program starting address to linker
 	.align 4			// MacOS
 _main:
-	KLOAD 	X0, buffer
-	KLOAD	X1, currkey
-	STR	X0, [X1]
-	KLOAD	X3, bufftop
-	STR	X0, [X3]
-
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST8
+	KLOAD	X8, MTEST9
 	NEXT				// won't return
 	
 DOCOL:
@@ -101,8 +95,8 @@ DOCOL:
 	ADD	X8, X0, #8	
 	NEXT
 	
-	.set	RETURN_STACK_SIZE,8192	// allocate static buffer for return stack
-	.set	BUFFER_SIZE,4096	// and input buffer (when reading files/text)
+	.set	RETURN_STACK_SIZE, 8192	
+	.set	BUFFER_SIZE,4096	// input buffer
 
 	.set 	F_IMMED,0x80		// three masks for the length field [*] below
 	.set 	F_HIDDEN,0x20
@@ -146,10 +140,23 @@ code_\label :				// assembler code follows
 .macro	DEFCONST name, namelen, flags=0, label, value
 	DEFCODE  \name,\namelen,\flags,\label
 	KLOAD	 X0, \value
-	PUSH	 X0
+	PUSHRSP	 X0
 	NEXT
 	.endm
+
+.macro 	DEFVAR 	name, namelen, flags=0, label, initial=0
+	DEFCODE \name,\namelen,\flags,\label
+	KLOAD	X0, var_\name
+	PUSHRSP	X0
+	NEXT
+	.data
+	.align 	4
+var_\name :
+	.quad	\initial
+	.endm
 	
+	//	DEFVAR "BASE",4,,BASE,10
+var_BASE:	.quad 10
 
 // Help assembler routines	
 
@@ -200,11 +207,6 @@ printhex1:
 	
 	RET
 
-sysexit:	
-	MOV   	X0, #0      		// Use 0 for return code, echo $? in bash to see it
-	MOV   	X16, #1     		// Service command code 1 terminates this program
-	SVC   	0           		// Call MacOS to terminate the program
-	
 hexchars:
 	.ascii  "0123456789ABCDEF"
 	.data
@@ -271,8 +273,13 @@ buffer:
 	NEXT
 
 	DEFCODE "HALT",4,,HALT	
-	B	sysexit
+	BL	_HALT
 	NEXT
+_HALT:
+	MOV   	X0, #0      		// Use 0 for return code, echo $? in bash to see it
+	MOV   	X16, #1     		// Service command code 1 terminates this program
+	SVC   	0           		// Call MacOS to terminate the program
+	
 
 	DEFWORD "DOUBLE",6,,DOUBLE  	// ( n -- n)
 	.quad 	DUP,PLUS,EXIT
@@ -359,7 +366,7 @@ _KEY:
 	MOV	X16, #3		// MacOS read system call
 	SVC	0
 	CMP	W0, 0		// returns with number of chars read
-	B.LE	sysexit		// <= 0 means EOF or error, so exit
+	B.LE	_HALT		// <= 0 means EOF or error, so exit
 	KLOAD	X1, buffer	
 	ADD	X0, X0, X1	// bufftop = X0 + buffer
 	KLOAD	X2, bufftop
@@ -396,6 +403,7 @@ bufftop:
 	} 
         */
 
+	// ( -- addr n ) where n is length of string starting at addr
 	DEFCODE "WORD",4,,WORD
 	BL	_WORD
 	PUSH	X1	// push base address
@@ -429,8 +437,63 @@ _WORD:
 
 	.data
 word_buffer:
-	//	.space	32
-	.ascii 	"01234567890123456789012345678901"
+	.space	32
+
+	// ( addr length -- n e ) convert string -> number
+	// n: parsed number, e: number of unparsed characters	
+	DEFCODE "NUMBER",6,,NUMBER	
+	POP	X1                      // length
+	POP	X0			// string address
+	BL	_NUMBER
+	PUSH	X0			// parsed number
+	PUSH	X1			// number of unparsed characters
+	NEXT
+_NUMBER:
+	PUSH	LR
+	MOV	X2, X0			// string address
+	MOV	X0, #0			// result after conversion
+	CMP	X1, #0
+	B.LE	5f			// error if length <= 0
+	KLOAD	X3, var_BASE
+	LDR	X3, [X3]
+	LDRB	W4, [X2], #1		// load first char
+	MOV	X5, #0
+	CMP	X4, '-'
+	B.NE	2f			// number is positive
+	MOV	X5, #1
+	SUB	X1, X1, #1
+	CMP	X1, #0			// do we have more than just "-" ?
+	B.GT	1f			// yes, proceed with conversion
+	MOV	X1, #1			// error
+	B	5f
+1:
+	MUL 	X6, X0, X3		//
+	MOV	X0, X6			// number *= BASE
+	LDRB	W4, [X2], #1
+2:
+	SUB 	X4, X4, '0'
+	CMP	X4, #0
+	B.LT	4f			// < 0, end
+	CMP	X4, #9
+	B.LE	3f			// digit
+	SUB	X4, X4, #17		// 17 = 'A' - '0'
+	CMP 	X4, #0
+	B.LT	4f
+	ADD	X4, X4, #10
+3:
+	CMP	X4, X3			// compare to current BASE
+	B.GE	4f			// end, > BASE
+	ADD	X0, X0, X4		// add digit to result
+	SUB	X1, X1, #1
+	CMP	X1, #0
+	B.GT 	1b			// continue processing while there are characters
+4:
+	CMP	X5, #1
+//	NEG	X0, X0			// fixme: negate if...
+5:
+	POP	LR
+	RET
+	
 
 	DEFCODE "EMIT",4,,EMIT	// ( a -- )  emit top of stack as ASCII
 	POP 	X0
@@ -469,7 +532,7 @@ _CR:
 newline:
 	.ascii	"\n"
 	
-	DEFCODE "EMITWORD",8,,EMITWORD	// ( a n -- )  emit n characters from string buffer a
+	DEFCODE "EMITWORD",8,,EMITWORD	// ( addr n -- )  emit n characters from string buffer addr
 	POP	X2		// length
 	POP	X1		// start
 	BL 	_EMITWORD
@@ -562,3 +625,12 @@ MTEST8:
 	.quad	EMIT
 	.quad	HALT
 	.quad	EXIT
+
+MTEST9:
+	.quad	WORD
+	.quad	NUMBER
+	.quad	DOT
+	.quad 	DOT
+	.quad	HALT
+	.quad	EXIT
+	
