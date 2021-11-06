@@ -10,6 +10,10 @@ Moving Forth
 <br>
 https://github.com/nornagon/jonesforth/blob/master/jonesforth.S
 
+ASE: Writing a Forth interpreter from scratch
+<br>
+https://sifflez.org/lectures/ASE/C3.pdf
+
 ## ARM assembly language programming
 
 Programming with 64-Bit ARM Assembly Language
@@ -39,6 +43,11 @@ https://eclecticlight.co/2021/06/21/code-in-arm-assembly-working-with-pointers/
 A Guide to ARM64/AArch64 Assembly on Linux with Shellcodes and Cryptography 
 <br>
 https://modexp.wordpress.com/2018/10/30/arm64-assembly/
+
+Porting Linux assembly programs to macOS:
+<br>
+https://rudamoura.com/porting-asm.html
+
 
 ## Debugging
 
