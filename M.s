@@ -102,22 +102,7 @@ DOCOL:
 	.set 	F_HIDDEN,0x20
 	.set 	F_LENMASK,0x1f		// length mask
         .set    link, 0
-        
-.macro  DEFWORD name, namelen, flags=0, label
-        .data
-        .align  4
-        .globl  name_\label
-name_\label :
-        .quad   link\@  
-        .set    link\@, name_\label
-        .byte   \flags+\namelen         // flags + length byte [*]
-        .ascii  "\name"                 // the name
-        .align  4                       // padding to next 4 byte boundary
-        .globl  \label
-\label :
-        .quad   DOCOL                   // codeword - the interpreter
-        // list of word pointers follow
-        .endm
+
 
 .macro 	DEFCODE name, namelen, flags=0, label
 	.data
@@ -137,12 +122,7 @@ name_\label :
 code_\label :				// assembler code follows
 	.endm
 	
-.macro	DEFCONST name, namelen, flags=0, label, value
-	DEFCODE  \name,\namelen,\flags,\label
-	KLOAD	 X0, \value
-	PUSHRSP	 X0
-	NEXT
-	.endm
+
 
 .macro 	DEFVAR 	name, namelen, flags=0, label, initial=0
 	DEFCODE \name,\namelen,\flags,\label
@@ -153,14 +133,19 @@ code_\label :				// assembler code follows
 	.align 	4
 var_\name :
 	.quad	\initial
-	.endm
+ 	.endm
 	
-	DEFVAR "BASE",4,,BASE,10		// fixme: bus error
-//var_BASE:	.quad 16
+.macro	DEFCONST name, namelen, flags=0, label, value
+	DEFCODE  \name,\namelen,\flags,\label
+	KLOAD	 X0, \value
+	PUSHRSP	 X0
+	NEXT
+	.endm
 
 // Help assembler routines	
-
-
+	
+	.text
+	.align 4
 printhex:	
 	// printhex -- print reg X0 as 16 char hex string 000000000000002A
 	// X1: pointer to output buffer hexbuf
@@ -229,92 +214,17 @@ buffer:
 // --------------------------
 	
 	DEFCONST "R0",2,,RZ,return_stack_top
-
-	DEFCODE	"EXIT",4,,EXIT		
-	POPRSP	X8
-	NEXT
+	DEFVAR "XXBASE",6,,XXBASE,10		// fixme: bus error
 	
-	DEFCODE "PLUS",4,,PLUS		// ( a b -- c ) 
-	POP	X0
-	POP	X1
-	ADD	X0, X0, X1
-	PUSH	X0
-	NEXT
+#include "primitives.s"
 	
-	DEFCODE "TIMES",5,,TIMES	// ( a b -- c ) 
-	POP	X0
-	POP	X1
-	MUL	X0, X0, X1
-	PUSH	X0
-	NEXT
-	
-	DEFCODE	"DUP",3,,DUP		// ( a -- a a )
-	POP	X0
-	PUSH	X0
-	PUSH	X0
-	NEXT
-		
-	DEFCODE "PUSH27",6,,PUSH27	// ( -- a )
-	MOV	X0, #27
-	PUSH	X0
-	NEXT
-
-	DEFCODE "DROP",4,,DROP
-	POP	X0
-	NEXT
-
-	DEFCODE ".",1,,DOT		// ( a -- )
-	POP	X0
-	BL	printhex
-	BL	_CR
-	NEXT
-
-	// special form: push next word as constant
-	// Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
-	DEFCODE	"LIT",3,,DOLIT		// ( -- n ) 
-	LDR	X0, [X8], #8
-	PUSH	X0
-	NEXT
-
-	DEFCODE "HALT",4,,HALT	
-	BL	_HALT
-	NEXT
+	.text
 _HALT:
 	MOV   	X0, #0      		// Use 0 for return code, echo $? in bash to see it
 	MOV   	X16, #1     		// Service command code 1 terminates this program
 	SVC   	0           		// Call MacOS to terminate the program
 	
-
-	DEFWORD "DOUBLE",6,,DOUBLE  	// ( n -- n)
-	.quad 	DUP,PLUS,EXIT
-
-	DEFWORD "TRIPLE",6,,TRIPLE	// ( n -- n)
-	.quad 	DUP,DUP,PLUS,PLUS,EXIT
-
-	DEFWORD "QUADRUPLE",9,,QUADRUPLE
-	.quad	DOUBLE,DOUBLE,EXIT
 	
-//	ANS FORTH says that the comparison words should return -1 for TRUE and 0 for FALSE
-//	Jones Forth uses the C programming convention 1 for TRUE and 0 for FALSE.
-//	Here, I'm using the ANS FORTH convention but if you prefer Jones Forth way of doing it, 
-//	replace CSETM with CSET below.
-
-	DEFCODE	"=",1,,EQU	// ( a b -- a ) top two words are equal?
-	POP	X0
-	POP	X1
-	CMP     X0, X1
-        CSETM   X0, EQ
-	PUSH	X0
-	NEXT
-
-	DEFCODE	"<>",1,,NEQ	// ( a b -- a ) top two words not equal?
-	POP	X0
-	POP	X1
-	CMP	X0, X1
-	CSETM	X0, NE
-	PUSH	X0
-	NEXT
-
 //--------------------------------------------------	
 // 	I/O
 //--------------------------------------------------	
@@ -344,10 +254,6 @@ _HALT:
 	}
 */
 
-	DEFCODE "KEY",3,,KEY	// ( -- a ) read next byte from stdin and push it on the stack
-	BL	_KEY
-	PUSH 	X0		// push return value on stack
-	NEXT
 _KEY:
 1:	
 	KLOAD	X1, currkey
@@ -407,12 +313,7 @@ bufftop:
 	} 
         */
 
-	// ( -- addr n ) where n is length of string starting at addr
-	DEFCODE "WORD",4,,WORD
-	BL	_WORD
-	PUSH	X1	// push base address
-	PUSH	X0	// push length
-	NEXT
+	.text
 _WORD:
 	PUSH	LR
 1:	
@@ -446,21 +347,19 @@ word_buffer:
 	// ( addr length -- n e ) convert string -> number
 	// n: parsed number, e: number of unparsed characters	
 	// fixme: "1a" is not same as "1A" - perhaps leaves unparsed characters?
-	DEFCODE "NUMBER",6,,NUMBER	
-	POP	X1                      // length
-	POP	X0			// string address
-	BL	_NUMBER
-	PUSH	X0			// parsed number
-	PUSH	X1			// number of unparsed characters
-	NEXT
+	
+	.text
 _NUMBER:
 	PUSH	LR
 	MOV	X2, X0			// string address
 	MOV	X0, #0			// result after conversion
 	CMP	X1, #0
 	B.LE	5f			// error if length <= 0
-	KLOAD	X3, var_BASE
-	LDR	X3, [X3]		// X3 = BASE
+	
+	//	KLOAD	X3, var_BASE
+	//	LDR	X3, [X3]		// X3 = BASE
+	MOV	X3, #10
+
 	LDRB	W4, [X2], #1		// load first char
 	MOV	X5, #0
 	CMP	X4, '-'
@@ -500,11 +399,7 @@ _NUMBER:
 	POP	LR
 	RET
 	
-
-	DEFCODE "EMIT",4,,EMIT	// ( a -- )  emit top of stack as ASCII
-	POP 	X0
-	BL 	_EMIT
-	NEXT
+	.text
 _EMIT:
 	KLOAD	X1, emit_buf	// string to print
 	STR	W0, [X1]	// store character
@@ -517,10 +412,7 @@ _EMIT:
 emit_buf:
 	.space 1		// buffer used by EMIT
 	
-	// fixme: rewrite this as DEFWORD using DOLIT 10 EMIT
-	DEFCODE	"CR",2,,CR	// ( -- ) emits a carriage return
-	BL	_CR
-	NEXT
+	.text
 _CR:
 	PUSH	X0
 	PUSH	X1
@@ -538,13 +430,8 @@ _CR:
 newline:
 	.ascii	"\n"
 	
-	DEFCODE "EMITWORD",8,,EMITWORD	// ( addr n -- )  emit n characters from string buffer addr
-	POP	X2		// length
-	POP	X1		// start
-	BL 	_EMITWORD
-	NEXT
-	// upon entering: X1 = buffer, X2 = length
-_EMITWORD:
+	.text
+_EMITWORD:			// upon entering: X1 = buffer, X2 = length
 	MOV	X0, #1		// 1 = stdout
 	MOV	X16, #4
 	SVC 	0
@@ -552,17 +439,10 @@ _EMITWORD:
 
 	.data
 	.align	4
-MTEST:
-	.quad 	PUSH27		// pointer to codeword of PUSH27
-	.quad 	DOUBLE	
-	.quad 	DOT		
-	.quad 	HALT
-	.quad 	EXIT		
-
 MTEST2:
 	.quad 	DOLIT
 	.quad	4
-	.quad 	TRIPLE	
+	.quad 	QUADRUPLE	
 	.quad 	DOT		
 	.quad 	HALT
 	.quad 	EXIT		
@@ -589,7 +469,7 @@ MTEST5:
 	.quad 	DOLIT
 	.quad	3
 	.quad 	DOLIT
-	.quad	3
+	.quad	4
 	.quad	NEQ
 	.quad 	DOT
 	.quad	HALT
