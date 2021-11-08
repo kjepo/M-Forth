@@ -31,6 +31,21 @@
 //
 // The ARM is a load/store architecture, i.e., operations like adding, shifting, etc are
 // performed on registers and the only instructions interacting with memory are load/store.
+
+//	ARM Notes
+//	=========
+//
+//	SUB a, b, c <=> a = b - c
+//	RSB a, b, c <=> a = c - b
+//
+//	CMP a, b <=> flags (only!) for a - b
+//	SUBS a, b, c <=> a = b - c (and flags!)
+//
+//	LDR a, [b, #c]  <=> a = M[b + #c]
+//	LDR a, [b, #c]! <=> a = M[b + #c], b = b + #c
+//	LDR a, [b], #c  <=> a = M[b], b = b + #c
+//
+
 //
 // 2. M FORTH
 //
@@ -87,7 +102,7 @@
 	.align 4			// MacOS
 _main:
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST9
+	KLOAD	X8, MTEST12
 	NEXT				// won't return
 	
 DOCOL:
@@ -95,9 +110,9 @@ DOCOL:
 	ADD	X8, X0, #8	
 	NEXT
 	
-	.set	M_VERSION,1
-	.set	RETURN_STACK_SIZE, 8192	
-	.set	BUFFER_SIZE,4096	// input buffer
+	.set M_VERSION,1
+	.set RETURN_STACK_SIZE, 8192	
+	.set BUFFER_SIZE,4096	// input buffer
 
 	.set 	F_IMMED,0x80		// three masks for the length field [*] below
 	.set 	F_HIDDEN,0x20
@@ -396,17 +411,31 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 //--------------------------------------------------	
 // 	Dictionary
 //--------------------------------------------------	
-
+	
+	// X1 = length, X0 = address
 _FIND:
-	KLOAD	X3, XLATEST
-	LDR	X3, [X3]
+	PUSH	X8		// save instruction pointer for later
+	KLOAD	X3, var_LATEST
+1:	LDR	X3, [X3]
 	CMP	X3, #0		// reached end of dictionary chain? 
-	B.EQ	4f
+	B.EQ	3f
 	MOV	X4, #0
-	
-	
-4:	
+	LDRB	W4, [X3, #8]	// load length + flags
+	AND	W4, W4, F_HIDDEN|F_LENMASK	// W4 = name length
+	CMP	W4, W1
+	B.NE	1b		// different lengths, try previous word
+	// compare strings, word by word
+2:	
+	LDRB	W5, [X0], #1
+	LDRB	W6, [X3], #1
+	CMP	W5, W6
+	B.NE	1b		// not same, try previous word
+	SUB	W4, W4, #1
+	B.NE	2b
+3:	
 	MOV 	X0, #0
+	BL	printhex
+	BL	_HALT
 	RET
 
 	//==================================================
