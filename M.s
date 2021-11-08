@@ -95,6 +95,7 @@ DOCOL:
 	ADD	X8, X0, #8	
 	NEXT
 	
+	.set	M_VERSION,1
 	.set	RETURN_STACK_SIZE, 8192	
 	.set	BUFFER_SIZE,4096	// input buffer
 
@@ -103,47 +104,6 @@ DOCOL:
 	.set 	F_LENMASK,0x1f		// length mask
         .set    link, 0
 
-
-.macro 	DEFCODE name, namelen, flags=0, label
-	.data
-	.align 	4
-	.globl 	name_\label
-name_\label :
-	.quad 	link\@			// link
-	.set 	link\@, name_\label
-	.byte 	\flags+\namelen		// flags + length byte
-	.ascii 	"\name"			// the name
-	.align 	4			// padding to next 4 byte boundary
-	.globl 	\label
-\label :
-	.quad 	code_\label		// codeword
-	.text
-	.globl 	code_\label
-code_\label :				// assembler code follows
-	.endm
-	
-
-
-.macro 	DEFVAR 	name, namelen, flags=0, label, initial=0
-	DEFCODE \name,\namelen,\flags,\label
-	KLOAD	X0, var_\name
-	PUSH	X0
-	NEXT
-	.data
-	.align 	4
-var_\name :
-	.quad	\initial
- 	.endm
-	
-.macro	DEFCONST name, namelen, flags=0, label, value
-	DEFCODE  \name,\namelen,\flags,\label
-	KLOAD	 X0, \value
-	PUSHRSP	 X0
-	NEXT
-	.endm
-
-// Help assembler routines	
-	
 	.text
 	.align 4
 printhex:	
@@ -213,9 +173,6 @@ buffer:
 // Primitive Word Definitions
 // --------------------------
 	
-	DEFCONST "R0",2,,RZ,return_stack_top
-	DEFVAR "XXBASE",6,,XXBASE,10		// fixme: bus error
-	
 #include "primitives.s"
 	
 	.text
@@ -223,7 +180,6 @@ _HALT:
 	MOV   	X0, #0      		// Use 0 for return code, echo $? in bash to see it
 	MOV   	X16, #1     		// Service command code 1 terminates this program
 	SVC   	0           		// Call MacOS to terminate the program
-	
 	
 //--------------------------------------------------	
 // 	I/O
@@ -356,9 +312,9 @@ _NUMBER:
 	CMP	X1, #0
 	B.LE	5f			// error if length <= 0
 	
-	//	KLOAD	X3, var_BASE
-	//	LDR	X3, [X3]		// X3 = BASE
-	MOV	X3, #10
+	KLOAD	X3, var_BASE
+	LDR	X3, [X3]		// X3 = BASE
+//	MOV	X3, #10
 
 	LDRB	W4, [X2], #1		// load first char
 	MOV	X5, #0
@@ -436,6 +392,26 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 	MOV	X16, #4
 	SVC 	0
 	RET
+
+//--------------------------------------------------	
+// 	Dictionary
+//--------------------------------------------------	
+
+_FIND:
+	KLOAD	X3, XLATEST
+	LDR	X3, [X3]
+	CMP	X3, #0		// reached end of dictionary chain? 
+	B.EQ	4f
+	MOV	X4, #0
+	
+	
+4:	
+	MOV 	X0, #0
+	RET
+
+	//==================================================
+	// Test suites
+	//==================================================
 
 	.data
 	.align	4
@@ -523,4 +499,26 @@ MTEST9:
 	.quad	DOT
 	.quad	HALT
 	.quad	EXIT
+	
+MTEST10:
+	.quad	RZ
+	.quad	DOT
+	.quad	HALT
+	
+MTEST11:	
+	.quad	BASE
+	.quad 	FETCH
+	.quad	DOT
+	.quad	VERSION
+	.quad	DOT
+	.quad	XLATEST
+	.quad	FETCH
+	.quad	DOT
+	.quad	HALT
+
+MTEST12:
+	.quad	WORD
+	.quad	FIND
+	.quad	DOT
+	.quad	HALT
 	
