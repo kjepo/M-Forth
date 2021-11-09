@@ -73,6 +73,21 @@
 	ADD \register, \register, \addr@PAGEOFF 
 .endm
 
+.macro DEBUGPRINT str, len, 
+	PUSH X0
+	PUSH X1
+	PUSH X2
+	MOV X0, #1
+	KLOAD X1, \str
+	MOV X2, \len
+	MOV X16, #4
+	SVC 0
+	POP X2
+	POP X1
+	POP X0
+.endm
+
+	
 // ARM hardware requires that the stack pointer is always 16-byte aligned.
 // We're wasting 8 bytes here because \register is only 8 bytes in size.
 // Note that stacks grown downwards.  (They don't have to, but that's the choice.)
@@ -430,21 +445,69 @@ _FIND:
 	CMP	X5, #0
 	B.EQ	3f		// end of dictionary
 	MOV	X7, #0
-	LDRB	W7, [X5, #8]	// load length + flags
-	AND	W7, W7, F_HIDDEN|F_LENMASK	// W4 = name length
+	LDRB	W7, [X5, #8]!	// load length + flags
+	AND	W7, W7, F_HIDDEN|F_LENMASK	// W7 = name length
 	CMP	W7, W1
 	B.NE	1b		// different lengths, try previous word
 	MOV	X2, X0		// copy address
-	ADD	X5, X5, #9	// X5 points to beginning of dictionary string
+	ADD	X5, X5, #1	// X5 points to beginning of dictionary string
 2:	LDRB	W6, [X5], #1 	// compare strings, character by character
 	LDRB	W7, [X2], #1
 	CMP	W6, W7
 	B.NE	1b		// not same, try previous word
-	SUB	W3, W3, #1
-	B.NE	2b
-3:	MOV	X0, X4
+	SUBS	W3, W3, #1
+	B.GT	2b		// still more characters to compare
+3:	MOV	X0, X4		// return with X0 -> dictionary header
 	POP	LR
 	RET
+
+_PRINTWORD:
+	// X1 -> beginning of dictionary entry
+	CMP X1, #0
+	BNE 1f
+	RET
+1:	PUSH LR
+	PUSH X1
+	DEBUGPRINT debug_start, debug_startstr_length
+	MOV X0, X1
+	BL printhex
+	BL _CR
+	DEBUGPRINT debug_prevstr, debug_prevstr_length	
+	LDR X0, [X1], #8
+	BL printhex
+	BL _CR
+	DEBUGPRINT debug_lenstr, debug_lenstr_length
+	MOV X0, #0
+	LDRB W0, [X1], #1	
+	AND W0, W0, F_HIDDEN|F_LENMASK	// length
+	MOV X2, X0	// len	
+	BL printhex
+	BL _CR
+	DEBUGPRINT debug_namestr, debug_namestr_length	
+	PUSH X0 %% PUSH X1 %% PUSH X2 %% PUSH X3
+	MOV X3, X1
+	MOV X0, #1	// stdout
+	MOV X1, X3	// str
+	MOV X16, #4
+PRINTWORD2:	
+	SVC 0
+	POP X3 %% POP X2 %% POP X1 %% POP X0
+
+	BL _CR
+	BL _CR
+	POP X1
+	POP LR
+	RET
+
+	.data
+debug_start:	 .ascii "start: "
+	debug_startstr_length=7
+debug_prevstr:	 .ascii "  prev: "
+	debug_prevstr_length=8
+debug_lenstr:	 .ascii "  length: "
+	debug_lenstr_length=10
+debug_namestr:	 .ascii "  name: "
+	debug_namestr_length=8
 
 	//==================================================
 	// Test suites
@@ -556,6 +619,7 @@ MTEST11:
 MTEST12:
 	.quad	WORD
 	.quad	FIND
+	.quad	PRINTWORD
 	.quad	DOT
 	.quad	HALT
 	
