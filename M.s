@@ -412,30 +412,38 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 // 	Dictionary
 //--------------------------------------------------	
 	
-	// X1 = length, X0 = address
+	// X0 = address
+	// X1 = length
+	// X2 = copy of X0
+	// X3 = copy of X1
+	// X4 = current dictionary word
+	// X5 = copy of X4
+	// X6 = character in X0 string
+	// X7 = character in X4 string, also len
+	// return with X0 = addr of word
 _FIND:
-	PUSH	X8		// save instruction pointer for later
-	KLOAD	X3, var_LATEST
-1:	LDR	X3, [X3]
-	CMP	X3, #0		// reached end of dictionary chain? 
-	B.EQ	3f
-	MOV	X4, #0
-	LDRB	W4, [X3, #8]	// load length + flags
-	AND	W4, W4, F_HIDDEN|F_LENMASK	// W4 = name length
-	CMP	W4, W1
+	PUSH 	LR
+	KLOAD	X4, var_LATEST
+1:	LDR	X4, [X4]
+	MOV	X5, X4
+	MOV	X3, X1
+	CMP	X5, #0
+	B.EQ	3f		// end of dictionary
+	MOV	X7, #0
+	LDRB	W7, [X5, #8]	// load length + flags
+	AND	W7, W7, F_HIDDEN|F_LENMASK	// W4 = name length
+	CMP	W7, W1
 	B.NE	1b		// different lengths, try previous word
-	// compare strings, word by word
-2:	
-	LDRB	W5, [X0], #1
-	LDRB	W6, [X3], #1
-	CMP	W5, W6
+	MOV	X2, X0		// copy address
+	ADD	X5, X5, #9	// X5 points to beginning of dictionary string
+2:	LDRB	W6, [X5], #1 	// compare strings, character by character
+	LDRB	W7, [X2], #1
+	CMP	W6, W7
 	B.NE	1b		// not same, try previous word
-	SUB	W4, W4, #1
+	SUB	W3, W3, #1
 	B.NE	2b
-3:	
-	MOV 	X0, #0
-	BL	printhex
-	BL	_HALT
+3:	MOV	X0, X4
+	POP	LR
 	RET
 
 	//==================================================
