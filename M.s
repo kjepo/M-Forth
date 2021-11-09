@@ -437,12 +437,10 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 	// X7 = character in X4 string, also len
 	// return with X0 = addr of word
 _FIND:
-	PUSH 	LR
 	KLOAD	X4, var_LATEST
 1:	LDR	X4, [X4]
-	MOV	X5, X4
 	MOV	X3, X1
-	CMP	X5, #0
+	ADDS	X5, XZR, X4	
 	B.EQ	3f		// end of dictionary
 	MOV	X7, #0
 	LDRB	W7, [X5, #8]!	// load length + flags
@@ -457,9 +455,21 @@ _FIND:
 	B.NE	1b		// not same, try previous word
 	SUBS	W3, W3, #1
 	B.GT	2b		// still more characters to compare
-3:	MOV	X0, X4		// return with X0 -> dictionary header
-	POP	LR
+3:	RET			// return with X4 -> dictionary header
+
+	// return the code field address in X1
+	// X0 - address of dictionary header
+_TCFA:	MOV	X2, #0
+	LDRB	W2, [X0, #8]!	// skip link pointer and load length + flags
+	AND	W2, W2, F_HIDDEN|F_LENMASK // strip the flags
+	ADD	X1, X0, X2	// skip characters
+	ADD	X1, X1, #8	// skip length byte (1) and add 7 
+	AND	X1, X1, #-7	// ... to make it 8-byte aligned
+	LDR	X0, [X1]
 	RET
+
+	
+
 
 _PRINTWORD:
 	// X1 -> beginning of dictionary entry
@@ -489,7 +499,6 @@ _PRINTWORD:
 	MOV X0, #1	// stdout
 	MOV X1, X3	// str
 	MOV X16, #4
-PRINTWORD2:	
 	SVC 0
 	POP X3 %% POP X2 %% POP X1 %% POP X0
 
@@ -618,8 +627,13 @@ MTEST11:
 
 MTEST12:
 	.quad	WORD
-	.quad	FIND
-	.quad	PRINTWORD
-	.quad	DOT
+	.quad	FIND		// get dictionary address of first word
+	.quad 	DUP		// make 2 copies
+	.quad 	DUP
+//	.quad	PRINTWORD	
+	.quad	DOT		// print address of dictionary entry
+	.quad 	TCFA
+	.quad	DOT		// print code field address
+	.quad 	TDFA
+	.quad	DOT		// print data field 
 	.quad	HALT
-	

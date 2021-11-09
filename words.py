@@ -60,6 +60,8 @@ prev = mkcode("TIMES", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0"
 prev = mkcode("DUP", "DUP", ["POP X0", "PUSH X0", "PUSH X0", "NEXT"])
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
+prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
+
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
@@ -92,10 +94,13 @@ prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT
 prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])
 prev = mkcode("@", "FETCH", ["POP X0", "LDR X0, [X0]", "PUSH X0", "NEXT"])
 # dictionary lookup ( length addr -- dictionaryp ) 
-prev = mkcode("FIND", "FIND", ["POP X1", "POP X0", "BL _FIND", "PUSH X0", "NEXT"])
+prev = mkcode("FIND", "FIND", ["POP X1", "POP X0", "BL _FIND", "PUSH X4", "NEXT"])
+prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
+prev = mkcode("PRINTWORD", "PRINTWORD", ["POP X1", "BL _PRINTWORD", "PUSH X1", "NEXT"])
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
+prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
