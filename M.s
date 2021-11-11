@@ -110,7 +110,7 @@
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST14
+	KLOAD	X8, MTEST15
 	NEXT				// won't return
 	
 DOCOL:
@@ -542,7 +542,7 @@ _PRINTWORD:
 	.data
 	.align	4
 MTEST2:
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	4
 	.quad 	QUADRUPLE	
 	.quad 	DOT		
@@ -550,9 +550,9 @@ MTEST2:
 	.quad 	EXIT		
 	
 MTEST3:
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	2
-	.quad	DOLIT
+	.quad	_LIT
 	.quad 	3
 	.quad 	TIMES	
 	.quad 	DOT		
@@ -560,7 +560,7 @@ MTEST3:
 	.quad 	EXIT		
 
 MTEST4:
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	3
 	.quad 	QUADRUPLE
 	.quad 	DOT
@@ -568,9 +568,9 @@ MTEST4:
 	.quad	EXIT
 
 MTEST5:
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	3
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	4
 	.quad	NEQ
 	.quad 	DOT
@@ -578,7 +578,7 @@ MTEST5:
 	.quad	EXIT
 
 MTEST6:
-	.quad 	DOLIT
+	.quad 	_LIT
 	.quad	65
 	.quad 	EMIT
 	.quad	HALT
@@ -603,12 +603,12 @@ MTEST7:
 MTEST8:
 	.quad	WORD
 	.quad	EMITWORD
-	.quad	DOLIT
+	.quad	_LIT
 	.quad	10
 	.quad	EMIT
 	.quad	WORD
 	.quad	EMITWORD
-	.quad	DOLIT
+	.quad	_LIT
 	.quad	10
 	.quad	EMIT
 	.quad	HALT
@@ -637,7 +637,7 @@ MTEST11:
 	.quad	DOT
 	.quad	VERSION
 	.quad	DOT
-	.quad	XLATEST
+	.quad	_LATEST
 	.quad	FETCH
 	.quad	DOT
 	.quad	HALT
@@ -669,8 +669,13 @@ MTEST14:
 	.quad	STATE
 	.quad	FETCH
 	.quad	DOT
-	
 	.quad	HALT
+
+MTEST15:
+	.quad	COLON
+	.quad	HALT
+	
+
 	
 	// The BSS segment won't add to the binary's size
 	.bss

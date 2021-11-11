@@ -65,7 +65,7 @@ prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
-prev = mkcode("LIT", "DOLIT", ["LDR X0, [X8], #8", "PUSH X0", "NEXT"])
+prev = mkcode("LIT", "_LIT", ["LDR X0, [X8], #8", "PUSH X0", "NEXT"])
 
 prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 
@@ -89,7 +89,7 @@ prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X0", "NEXT"])
 prev = mkcode("NUMBER", "NUMBER", ["POP X1", "POP X0", "BL _NUMBER", "PUSH X0", "PUSH X1", "NEXT"])
 # EMIT ( a -- ) emit top of stack as ASCII
 prev = mkcode("EMIT", "EMIT", ["POP X0", "BL _EMIT", "NEXT"])
-# fixme: rewrite this as a mkword using DOLIT 10, EMIT
+# fixme: rewrite this as a mkword using _LIT 10, EMIT
 prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT"])
 prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])
 prev = mkcode("@", "FETCH", ["POP X0", "LDR X0, [X0]", "PUSH X0", "NEXT"])
@@ -104,13 +104,28 @@ prev = mkcode(",", "COMMA", ["POP X0", "BL _COMMA", "NEXT"])
 prev = mkcode("[", "_LBRAC", ["KLOAD X0, var_STATE", "MOV X1, #0", "STR X1, [X0]", "NEXT"], "F_IMMED");
 # ] sets STATE=1 (compile mode)
 prev = mkcode("]", "_RBRAC", ["KLOAD X0, var_STATE", "MOV X1, #1", "STR X1, [X0]", "NEXT"], "F_IMMED");
-			      
-
-
+prev = mkcode("HIDDEN", "HIDDEN", [
+     "POP  X0",          	  # dictionary entry
+     "ADD  X0, X0, #8",  	  # advance to length/flags byte
+     "LDRB W1, [X0]",		  # get length/flags
+     "EOR  W1, W1, F_HIDDEN",	  # toggle the HIDDEN bit
+     "STRB W1, [X0]",
+     "NEXT"])
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
+prev = mkword(":", "COLON", [
+     "WORD",	   # get the name of the word
+     "CREATE",	   # CREATE the new dictionary entry/header
+     "_LIT",	   # Append DOCOL (the codeword)
+     "DOCOL",
+     "COMMA",
+     "_LATEST",	   # Make the word hidden
+     "FETCH",	   
+     "HIDDEN",
+     "_RBRAC",	   # Go into compile mode
+     "EXIT"]);
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
@@ -120,4 +135,4 @@ prev = mkvar("HERE", "HERE")
 prev = mkvar("S0", "SZ")
 prev = mkvar("BASE", "BASE", 10)
 # substitute in the last entry for name_BASE below:
-prev = mkvar("LATEST", "XLATEST", "name_BASE")
+prev = mkvar("LATEST", "_LATEST", "name_BASE")
