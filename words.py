@@ -83,49 +83,107 @@ prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X0, X1", "CSETM X0, NE", "P
 
 # KEY ( -- c ) where c is next character from stdin
 prev = mkcode("KEY", "KEY", ["BL _KEY", "PUSH X0", "NEXT"])
+
 # WORD ( -- addr n ) where n is length of string starting at addr
 prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X0", "NEXT"])
+
 # NUMBER ( addr length -- n e ) convert string -> number: n is parsed number, e is nr of unparsed chars
 prev = mkcode("NUMBER", "NUMBER", ["POP X1", "POP X0", "BL _NUMBER", "PUSH X0", "PUSH X1", "NEXT"])
+
 # EMIT ( a -- ) emit top of stack as ASCII
 prev = mkcode("EMIT", "EMIT", ["POP X0", "BL _EMIT", "NEXT"])
+
 # fixme: rewrite this as a mkword using _LIT 10, EMIT
 prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT"])
-prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])
-prev = mkcode("@", "FETCH", ["POP X0", "LDR X0, [X0]", "PUSH X0", "NEXT"])
-# dictionary lookup ( length addr -- dictionaryp ) 
-prev = mkcode("FIND", "FIND", ["POP X1", "POP X0", "BL _FIND", "PUSH X4", "NEXT"])
-prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
-prev = mkcode("PRINTWORD", "PRINTWORD", ["POP X1", "BL _PRINTWORD", "PUSH X1", "NEXT"])
-prev = mkcode("CREATE", "CREATE", ["POP X1", "POP X0", "BL _CREATE", "NEXT"])
-prev = mkcode(",", "COMMA", ["POP X0", "BL _COMMA", "NEXT"])
 
-# [ sets STATE=0 (immediate mode)
-prev = mkcode("[", "_LBRAC", ["KLOAD X0, var_STATE", "MOV X1, #0", "STR X1, [X0]", "NEXT"], "F_IMMED");
-# ] sets STATE=1 (compile mode)
-prev = mkcode("]", "_RBRAC", ["KLOAD X0, var_STATE", "MOV X1, #1", "STR X1, [X0]", "NEXT"], "F_IMMED");
-prev = mkcode("HIDDEN", "HIDDEN", [
+prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])   # ( -- ) print carriage return
+
+prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
+     "POP  X0",
+     "LDR  X0, [X0]",
+     "PUSH X0",
+     "NEXT"])
+
+prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string  
+     "POP  X1",
+     "POP  X0",
+     "BL   _FIND",
+     "PUSH X4",
+     "NEXT"])
+
+prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
+
+prev = mkcode("PRINTWORD", "PRINTWORD", [    # ( addr -- ) prints info on dictionary entry
+     "POP  X1",
+     "BL   _PRINTWORD",
+     "PUSH X1",
+     "NEXT"])
+
+prev = mkcode("CREATE", "CREATE", [    # ( addr length -- ) creates header for word
+     "POP X1",		# length
+     "POP X0",		# addr
+     "BL  _CREATE",
+     "NEXT"])
+
+prev = mkcode(",", "COMMA", [	  # ( n -- ) write n into HERE, increment HERE
+     "POP X0",
+     "BL  _COMMA",
+     "NEXT"])
+
+prev = mkcode("[", "_LBRAC", [    # ( -- ) sets STATE=0 (immediate mode)
+     "KLOAD X0, var_STATE",
+     "MOV   X1, #0",
+     "STR   X1, [X0]",
+     "NEXT"], "F_IMMED")
+
+
+prev = mkcode("]", "_RBRAC", [    # ( -- ) sets STATE=1 (compile mode)
+     "KLOAD X0, var_STATE",
+     "MOV   X1, #1",
+     "STR X1, [X0]",
+     "NEXT"])
+
+prev = mkcode("HIDDEN", "HIDDEN", [  	  # ( addr -- ) toggle HIDDEN bit in dictionary entry
      "POP  X0",          	  # dictionary entry
-     "ADD  X0, X0, #8",  	  # advance to length/flags byte
-     "LDRB W1, [X0]",		  # get length/flags
+     "ADD  X0, X0, #8",
+     "LDRB W1, [X0]",		  # get length/flags byte
      "EOR  W1, W1, F_HIDDEN",	  # toggle the HIDDEN bit
      "STRB W1, [X0]",
      "NEXT"])
 
+# ( -- ) toggle IMMED bit for latest dictionary entry
+prev = mkcode("IMMEDIATE", "IMMEDIATE", [ 
+     "KLOAD X0, var_LATEST",
+     "LDR   X0, [X0]",		  # X0 = LATEST
+     "ADD   X0, X0, #8",
+     "LDRB  W1, [X0]",		  # get length/flag byte
+     "EOR   W1, W1, F_IMMED",	  # toggle IMMED bit
+     "STRB  W1, [X0]",
+     "NEXT" ], "F_IMMED")
+
+# ( -- addr ) get codeword pointer of next word
+# Common usage is ' FOO , which appends the codeword FOO to the current word
+# Note: this only works in compiled mode
+prev = mkcode("'", "TICK", [
+     "LDR  X0, [X8], #8",
+     "PUSH X0",
+     "NEXT" ])
+
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
-prev = mkword(":", "COLON", [
-     "WORD",	   # get the name of the word
-     "CREATE",	   # CREATE the new dictionary entry/header
-     "_LIT",	   # Append DOCOL (the codeword)
-     "DOCOL",
-     "COMMA",
-     "_LATEST",	   # Make the word hidden
-     "FETCH",	   
-     "HIDDEN",
-     "_RBRAC",	   # Go into compile mode
-     "EXIT"]);
+
+prev = mkword(":", "COLON", [ 	        # start word definition
+     "WORD",				# get the name of the word
+     "CREATE",	   		        # CREATE the new dictionary entry/header
+     "_LIT", "DOCOL", "COMMA", 	  	# append DOCOL (the codeword)
+     "_LATEST", "FETCH", "HIDDEN",      # make the word hidden
+     "_RBRAC", "EXIT" ]) 		# go into compile mode
+
+prev = mkword(";", "SEMICOLON", [	# finish word definition 
+     "_LIT", "EXIT", "COMMA",		# append EXIT (so the word will return)
+     "_LATEST", "FETCH", "HIDDEN",	# toggle hidden flag -- unhide the word
+     "_LBRAC", "EXIT" ], "F_IMMED")	# go back to IMMEDIATE mode
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")

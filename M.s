@@ -110,7 +110,7 @@
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST15
+	KLOAD	X8, MTEST16
 	NEXT				// won't return
 	
 DOCOL:
@@ -382,12 +382,18 @@ _NUMBER:
 	
 	.text
 _EMIT:
+	PUSH	X1
+	PUSH	X2
+	PUSH    LR
 	KLOAD	X1, emit_buf	// string to print
 	STR	W0, [X1]	// store character
 	MOV	X0, #1		// 1 = stdout
 	MOV	X2, #1		// length of our string
 	MOV   	X16, #4		// MacOS write system call
 	SVC	0
+	POP     LR
+	POP	X2
+	POP	X1
 	RET
 	.data			// NB: easier to fit in the .data section
 emit_buf:
@@ -395,21 +401,8 @@ emit_buf:
 	
 	.text
 _CR:
-	PUSH	X0
-	PUSH	X1
-	PUSH	X2
-	MOV 	X0, #1			// 1 = stdout
-	KLOAD 	X1, newline		// string to print
-	MOV   	X2, #1	 		// length of our string
-	MOV   	X16, #4      		// MacOS write system call
-	SVC   	0     	 		// Output the string
-	POP	X2
-	POP	X1
-	POP	X0
+	KPRINT  "\n"
 	RET
-	.data
-newline:
-	.ascii	"\n"
 	
 	.text
 _EMITWORD:			// upon entering: X1 = buffer, X2 = length
@@ -517,13 +510,29 @@ _PRINTWORD:
 	LDR X0, [X1], #8
 	BL printhex
 	BL _CR
+	
 	KPRINT "length:   "
 	MOV X0, #0
-	LDRB W0, [X1], #1	
+	LDRB W0, [X1]
 	AND W0, W0, F_LENMASK	// length
 	MOV X2, X0	// len	
 	BL printhex
-	BL _CR
+
+	KPRINT ", immediate="
+	LDRB   W0, [X1]
+	AND    W0, W0, F_IMMED	// immediate mask
+	ASR    W0, W0, #7
+	ADD    W0, W0, '0'
+	BL     _EMIT
+
+	KPRINT ", hidden="
+	LDRB   W0, [X1], #1
+	AND    W0, W0, F_HIDDEN	// hidden mask
+	ASR    W0, W0, #5
+	ADD    W0, W0, '0'
+	BL     _EMIT
+	BL     _CR
+	
 	KPRINT "name:     "
 	MOV X3, X1
 	MOV X0, #1	// stdout
@@ -676,9 +685,23 @@ MTEST15:
 	.quad	COLON
 	.quad 	_LATEST
 	.quad	FETCH
+	.quad	DUP
+	.quad	DUP
+	.quad	HIDDEN
+	.quad	PRINTWORD
+	.quad	IMMEDIATE
 	.quad	PRINTWORD
 	.quad	HALT
 
+MTEST16:	
+	.quad	WORD
+	.quad	FIND
+	.quad	PRINTWORD
+	.quad 	TICK
+	.quad	DUP	// doesn't work: TICK returns address of DUP's codeword, not dict entry
+	.quad	PRINTWORD
+	
+	.quad	HALT
 	
 	// The BSS segment won't add to the binary's size
 	.bss
