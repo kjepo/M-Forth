@@ -472,7 +472,8 @@ _CREATE:
 	LDR	X3, [X3]	// X3 = HERE = next available place in data segment
 	MOV	X5, X3		// X5 = copy of original HERE
 	STR	X2, [X3], #8 	// *X3++ = LATEST
-	STR	X1, [X3], #1	// *X3++ = length
+	MOV	X7, X3
+	STRB	W1, [X3], #1	// *X3++ = length
 1:	LDRB	W2, [X0], #1	// *X3++ = *X0++
 	STRB	W2, [X3], #1
 	SUBS	X1, X1, #1
@@ -519,7 +520,7 @@ _PRINTWORD:
 	KPRINT "length:   "
 	MOV X0, #0
 	LDRB W0, [X1], #1	
-	AND W0, W0, F_HIDDEN|F_LENMASK	// length
+	AND W0, W0, F_LENMASK	// length
 	MOV X2, X0	// len	
 	BL printhex
 	BL _CR
@@ -673,8 +674,10 @@ MTEST14:
 
 MTEST15:
 	.quad	COLON
+	.quad 	_LATEST
+	.quad	FETCH
+	.quad	PRINTWORD
 	.quad	HALT
-	
 
 	
 	// The BSS segment won't add to the binary's size
