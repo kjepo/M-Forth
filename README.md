@@ -2,6 +2,9 @@
 
 ## Abstract
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
+<p>
+<b>Note:</b>This is work in progress and not yet ready for release.
+</p>
 
 ## Introduction and background
 This document will not explain FORTH in detail
