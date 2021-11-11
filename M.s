@@ -110,7 +110,7 @@
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST13
+	KLOAD	X8, MTEST14
 	NEXT				// won't return
 	
 DOCOL:
@@ -658,6 +658,18 @@ MTEST12:
 MTEST13:
 	.quad 	WORD
 	.quad	CREATE
+	.quad	HALT
+
+MTEST14:
+	.quad 	_LBRAC
+	.quad	STATE
+	.quad	FETCH
+	.quad	DOT
+	.quad 	_RBRAC
+	.quad	STATE
+	.quad	FETCH
+	.quad	DOT
+	
 	.quad	HALT
 	
 	// The BSS segment won't add to the binary's size

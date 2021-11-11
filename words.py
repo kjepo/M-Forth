@@ -100,6 +100,13 @@ prev = mkcode("PRINTWORD", "PRINTWORD", ["POP X1", "BL _PRINTWORD", "PUSH X1", "
 prev = mkcode("CREATE", "CREATE", ["POP X1", "POP X0", "BL _CREATE", "NEXT"])
 prev = mkcode(",", "COMMA", ["POP X0", "BL _COMMA", "NEXT"])
 
+# [ sets STATE=0 (immediate mode)
+prev = mkcode("[", "_LBRAC", ["KLOAD X0, var_STATE", "MOV X1, #0", "STR X1, [X0]", "NEXT"], "F_IMMED");
+# ] sets STATE=1 (compile mode)
+prev = mkcode("]", "_RBRAC", ["KLOAD X0, var_STATE", "MOV X1, #1", "STR X1, [X0]", "NEXT"], "F_IMMED");
+			      
+
+
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
