@@ -73,20 +73,12 @@
 	ADD \register, \register, \addr@PAGEOFF 
 .endm
 
-.macro DEBUGPRINT str, len, 
-	PUSH X0
-	PUSH X1
-	PUSH X2
-	MOV X0, #1
-	KLOAD X1, \str
-	MOV X2, \len
-	MOV X16, #4
-	SVC 0
-	POP X2
-	POP X1
-	POP X0
+.macro KSTRING label, str
+\label:	.asciz "\str"
+	.align 4
 .endm
 
+	#include "kprint.s"
 	
 // ARM hardware requires that the stack pointer is always 16-byte aligned.
 // We're wasting 8 bytes here because \register is only 8 bytes in size.
@@ -116,8 +108,9 @@
 	.global _main          		// Provide program starting address to linker
 	.align 4			// MacOS
 _main:
+	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST12
+	KLOAD	X8, MTEST13
 	NEXT				// won't return
 	
 DOCOL:
@@ -128,7 +121,7 @@ DOCOL:
 	.set M_VERSION,1
 	.set RETURN_STACK_SIZE, 8192	
 	.set BUFFER_SIZE,4096	// input buffer
-
+	.set INITIAL_DATA_SEGMENT_SIZE, 1024*1024   	// 1 MB
 	.set 	F_IMMED,0x80		// three masks for the length field [*] below
 	.set 	F_HIDDEN,0x20
 	.set 	F_LENMASK,0x1f		// length mask
@@ -330,6 +323,8 @@ _WORD:
 word_buffer:
 	.space	32
 
+
+
 	// ( addr length -- n e ) convert string -> number
 	// n: parsed number, e: number of unparsed characters	
 	// fixme: "1a" is not same as "1A" - perhaps leaves unparsed characters?
@@ -461,14 +456,49 @@ _FIND:
 	// X0 - address of dictionary header
 _TCFA:	MOV	X2, #0
 	LDRB	W2, [X0, #8]!	// skip link pointer and load length + flags
-	AND	W2, W2, F_HIDDEN|F_LENMASK // strip the flags
+	AND	W2, W2, F_LENMASK // strip the flags
 	ADD	X1, X0, X2	// skip characters
 	ADD	X1, X1, #8	// skip length byte (1) and add 7 
 	AND	X1, X1, #-7	// ... to make it 8-byte aligned
 	LDR	X0, [X1]
 	RET
 
+	// X1: length
+	// X0: address of name
+_CREATE:
+	KLOAD	X2, var_LATEST
+	LDR	X2, [X2]	// X2 = LATEST = latest dictionary entry
+	KLOAD	X3, var_HERE
+	LDR	X3, [X3]	// X3 = HERE = next available place in data segment
+	MOV	X5, X3		// X5 = copy of original HERE
+	STR	X2, [X3], #8 	// *X3++ = LATEST
+	STR	X1, [X3], #1	// *X3++ = length
+1:	LDRB	W2, [X0], #1	// *X3++ = *X0++
+	STRB	W2, [X3], #1
+	SUBS	X1, X1, #1
+	B.NE	1b
+	ADD	X3, X3, #7
+	AND	X3, X3, #-7
+	KLOAD	X2, var_LATEST
+	STR	X5, [X2]	// LATEST = original HERE
+	KLOAD	X4, var_HERE
+	STR	X3, [X4]	// HERE = X3
+	RET
+
+	// X0 = code pointer to store 
+_COMMA:
+	KLOAD	X2, var_HERE
+	LDR	X1, [X2]	// X1 = HERE
+	STR	X0, [X1], #8	// *X1++ = X0
+	STR	X1, [X2]	// HERE = X1
+	RET
 	
+	.text
+_set_up_data_segment:
+	KLOAD 	X0, var_HERE
+	KLOAD 	X1, data_segment
+	STR 	X1, [X0]
+	RET
 
 
 _PRINTWORD:
@@ -476,47 +506,34 @@ _PRINTWORD:
 	CMP X1, #0
 	BNE 1f
 	RET
-1:	PUSH LR
-	PUSH X1
-	DEBUGPRINT debug_start, debug_startstr_length
+1:	
+	PUSH X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
+	KPRINT "start:    "
 	MOV X0, X1
 	BL printhex
 	BL _CR
-	DEBUGPRINT debug_prevstr, debug_prevstr_length	
+	KPRINT "previous: "
 	LDR X0, [X1], #8
 	BL printhex
 	BL _CR
-	DEBUGPRINT debug_lenstr, debug_lenstr_length
+	KPRINT "length:   "
 	MOV X0, #0
 	LDRB W0, [X1], #1	
 	AND W0, W0, F_HIDDEN|F_LENMASK	// length
 	MOV X2, X0	// len	
 	BL printhex
 	BL _CR
-	DEBUGPRINT debug_namestr, debug_namestr_length	
-	PUSH X0 %% PUSH X1 %% PUSH X2 %% PUSH X3
+	KPRINT "name:     "
 	MOV X3, X1
 	MOV X0, #1	// stdout
 	MOV X1, X3	// str
 	MOV X16, #4
 	SVC 0
-	POP X3 %% POP X2 %% POP X1 %% POP X0
 
 	BL _CR
 	BL _CR
-	POP X1
-	POP LR
+	POP LR %% POP X3 %% POP X2 %% POP X1 %% POP X0
 	RET
-
-	.data
-debug_start:	 .ascii "start: "
-	debug_startstr_length=7
-debug_prevstr:	 .ascii "  prev: "
-	debug_prevstr_length=8
-debug_lenstr:	 .ascii "  length: "
-	debug_lenstr_length=10
-debug_namestr:	 .ascii "  name: "
-	debug_namestr_length=8
 
 	//==================================================
 	// Test suites
@@ -630,10 +647,21 @@ MTEST12:
 	.quad	FIND		// get dictionary address of first word
 	.quad 	DUP		// make 2 copies
 	.quad 	DUP
-//	.quad	PRINTWORD	
+	.quad	PRINTWORD	
 	.quad	DOT		// print address of dictionary entry
 	.quad 	TCFA
 	.quad	DOT		// print code field address
 	.quad 	TDFA
 	.quad	DOT		// print data field 
 	.quad	HALT
+
+MTEST13:
+	.quad 	WORD
+	.quad	CREATE
+	.quad	HALT
+	
+	// The BSS segment won't add to the binary's size
+	.bss
+data_segment:	
+	.space INITIAL_DATA_SEGMENT_SIZE
+	

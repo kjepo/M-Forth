@@ -43,7 +43,7 @@ def mkconstint(name, label, value, flags=0):
 def mkconstaddr(name, label, value, flags=0):
     return mkcode(name, label, ["KLOAD X0, " + value, "PUSH X0", "NEXT"], flags)
     
-def mkvar(name, label, initial, flags=0):
+def mkvar(name, label, initial=0, flags=0):
     return mkcode(name, label, [
     		 "KLOAD X0, var_" + name,
 		 "PUSH X0",
@@ -97,6 +97,9 @@ prev = mkcode("@", "FETCH", ["POP X0", "LDR X0, [X0]", "PUSH X0", "NEXT"])
 prev = mkcode("FIND", "FIND", ["POP X1", "POP X0", "BL _FIND", "PUSH X4", "NEXT"])
 prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
 prev = mkcode("PRINTWORD", "PRINTWORD", ["POP X1", "BL _PRINTWORD", "PUSH X1", "NEXT"])
+prev = mkcode("CREATE", "CREATE", ["POP X1", "POP X0", "BL _CREATE", "NEXT"])
+prev = mkcode(",", "COMMA", ["POP X0", "BL _COMMA", "NEXT"])
+
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
@@ -105,6 +108,9 @@ prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
 
+prev = mkvar("STATE", "STATE")
+prev = mkvar("HERE", "HERE")
+prev = mkvar("S0", "SZ")
 prev = mkvar("BASE", "BASE", 10)
 # substitute in the last entry for name_BASE below:
 prev = mkvar("LATEST", "XLATEST", "name_BASE")
