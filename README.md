@@ -91,7 +91,7 @@ Let's look at the previous example:
 : QUADRUPLE DOUBLE DOUBLE ;
 </pre>
 
-<img src="http://beta.rad.pub/ftp/pics-6.png">
+<img src="http://beta.rad.pub/ftp/innerint-1.png">
 
 
 In this figure, gray cells denote the so called "codewords" which contains
