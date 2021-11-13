@@ -169,6 +169,18 @@ prev = mkcode("'", "TICK", [
      "PUSH X0",
      "NEXT" ])
 
+# add the offset to the instruction pointer
+prev = mkcode("BRANCH", "BRANCH", [ "LDR X0, [X8]", "ADD X8, X8, X0", "NEXT" ])
+
+prev = mkcode("0BRANCH", "ZBRANCH", [
+     "POP  X0",
+     "CMP  X0, #0",		# top of stack == 0 ?
+     "B.EQ code_BRANCH",	# if so, jump back to the branch function above
+     "LDR  X0, [X8], #8",	# otherwise, skip the offset
+     "NEXT "])
+
+
+
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
