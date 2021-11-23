@@ -16,10 +16,10 @@
 //------------------------------------------------
 //
 // 1. WHAT IS M1?
-// 
+//
 // The M1 ("Apple Silicon") is the first Apple ARM processor.
 // It is a 64-bit processor with registers X0-X30:
-//	X0-X7	For function parameters.  
+//	X0-X7	For function parameters.
 //	X0-X18	Registers that a function is free to use without saving.
 //	X19-X30	These are callee saved so must be pushed to a stack if used.
 //	SP	is the stackpointer
@@ -60,66 +60,39 @@
 // since a 64-bit address won't fit into a 32-bit instruction so
 // this operation is done in two steps: first load the address of
 // the page, then add the offset.  I guess it's possible to design
-// a 32-bit FORTH by sticking to one 32-bit address space, but 
-// this is not something I have investigated.	
+// a 32-bit FORTH by sticking to one 32-bit address space, but
+// this is not something I have investigated.
 
 // footnote: this is how cc compiles it:
 //	adrp	x19, _buffer@GOTPAGE
 //	ldr	x19, [x19, _buffer@GOTPAGEOFF]
 
-
-.macro 	KLOAD register, addr			
-	ADRP \register, \addr@PAGE		
-	ADD \register, \register, \addr@PAGEOFF 
-.endm
-
-.macro KSTRING label, str
-\label:	.asciz "\str"
-	.align 4
-.endm
-
+	#include "kload.s"
 	#include "kprint.s"
-	
-// ARM hardware requires that the stack pointer is always 16-byte aligned.
-// We're wasting 8 bytes here because \register is only 8 bytes in size.
-// Note that stacks grown downwards.  (They don't have to, but that's the choice.)
+	#include "pushpop.s"
+	#include <sys/syscall.h>
 
-.macro	PUSH  	register			// push register on data stack
-	STR   	\register, [SP, #-16]!
-.endm
-
-.macro	POP   	register			// pop register from data stack
-	LDR   	\register, [SP], #16
-.endm	
-
-.macro	PUSHRSP	register			// push register on return stack
-	STR   	\register, [X9, #-16]!
-.endm
-
-.macro	POPRSP 	register			// pop register from return stack
-	LDR   	\register, [X9], #16
-.endm	
-
-.macro  NEXT
+  .macro  NEXT
 	LDR	X0, [X8], #8
 	LDR	X1, [X0]
-	BLR   	X1	
-.endm
+	BLR   	X1
+  .endm
+
 	.global _main          		// Provide program starting address to linker
 	.align 4			// MacOS
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST16
+	KLOAD	X8, MTEST18
 	NEXT				// won't return
-	
+
 DOCOL:
-	PUSHRSP	X8		
-	ADD	X8, X0, #8	
+	PUSHRSP	X8
+	ADD	X8, X0, #8
 	NEXT
-	
+
 	.set M_VERSION,1
-	.set RETURN_STACK_SIZE, 8192	
+	.set RETURN_STACK_SIZE, 8192
 	.set BUFFER_SIZE,4096	// input buffer
 	.set INITIAL_DATA_SEGMENT_SIZE, 1024*1024   	// 1 MB
 	.set 	F_IMMED,0x80		// three masks for the length field [*] below
@@ -129,16 +102,16 @@ DOCOL:
 
 	.text
 	.align 4
-printhex:	
+printhex:
 	// printhex -- print reg X0 as 16 char hex string 000000000000002A
 	// X1: pointer to output buffer hexbuf
-	// W2: scratch register 
+	// W2: scratch register
 	// X3: pointer to hex characters hexchars
-	// W4: holds next hex digit 
+	// W4: holds next hex digit
 	// W5: loop counter
 	// Note 1: W2 is the lower 32-bit word of 64-bit register X2
 	// Note 2: printhex is a leaf function, no need to save LR
-	
+
 	PUSH	LR
 	PUSH	X1
 	PUSH	X2
@@ -165,14 +138,14 @@ printhex1:
 	MOV   	X2, #16	 		// length of our string
 	MOV   	X16, #4      		// MacOS write system call
 	SVC   	0     	 		// Output the string
-	
+
 	POP	X5
 	POP	X4
 	POP	X3
 	POP	X2
 	POP	X1
 	POP	LR
-	
+
 	RET
 
 hexchars:
@@ -180,9 +153,9 @@ hexchars:
 	.data
 hexbuf:
 	.ascii  "0000000000000000"
-	
+
 	.align 4			// FIXME: Align to page size (4096 doesn't work)
-return_stack:	
+return_stack:
 	.space RETURN_STACK_SIZE	// Allocate static memory for the return stack
 return_stack_top:
 
@@ -190,35 +163,35 @@ return_stack_top:
 	.align 4
 buffer:
 	.space BUFFER_SIZE
-	
+
 
 // --------------------------
 // Primitive Word Definitions
 // --------------------------
-	
+
 #include "primitives.s"
-	
+
 	.text
 _HALT:
 	MOV   	X0, #0      		// Use 0 for return code, echo $? in bash to see it
 	MOV   	X16, #1     		// Service command code 1 terminates this program
 	SVC   	0           		// Call MacOS to terminate the program
-	
-//--------------------------------------------------	
+
+//--------------------------------------------------
 // 	I/O
-//--------------------------------------------------	
-	
-/*	
+//--------------------------------------------------
+
+/*
 	KEY reads the next byte from stdin and pushes it on the stack.
 	It uses a buffer and two pointers, buffer and bufftop.
 
 	#define BUFFER_SIZE 4096
 	char buffer[BUFFER_SIZE];
-	char *bufftop = buffer; 
+	char *bufftop = buffer;
 	char *currkey = buffer;
 
 	char key() {
-	    int n;	
+	    int n;
 	l1:
 	    if (currkey >= bufftop)
 	        goto l2;
@@ -234,29 +207,29 @@ _HALT:
 */
 
 _KEY:
-1:	
+1:
 	KLOAD	X1, currkey
 	LDR	X2, [X1]	// X2 = currkey
 	KLOAD	X3, bufftop
 	LDR	X4, [X3]	// X4 = bufftop
 	CMP	X2, X4		// currkey == bufftop ?
 	B.GE	2f		// exhausted the input buffer?
-	MOV	X0, #0	
+	MOV	X0, #0
 	LDRB	W0, [X2], #1	// W0 = *currkey++
 	STR	X2, [X1]
 	RET
-2:	
+2:
 	// Out of input; use read(2) to fetch more input from stdin.
 	MOV	W0, 0		// stdin
 	KLOAD	X1, buffer
-	KLOAD	X2, currkey	
+	KLOAD	X2, currkey
 	STR	X1, [X2]	// currkey = buffer
 	MOV	X2, BUFFER_SIZE
 	MOV	X16, #3		// MacOS read system call
 	SVC	0
 	CMP	W0, 0		// returns with number of chars read
 	B.LE	_HALT		// <= 0 means EOF or error, so exit
-	KLOAD	X1, buffer	
+	KLOAD	X1, buffer
 	ADD	X0, X0, X1	// bufftop = X0 + buffer
 	KLOAD	X2, bufftop
 	STR	X0, [X2]
@@ -269,11 +242,11 @@ currkey:
 bufftop:
 	.quad	buffer		// Last valid data in input buffer + 1.
 
-	/* WORD reads the next the full word of input 
+	/* WORD reads the next the full word of input
 
 	char word_buffer[32];
 
-	char *word(int *len) {                                
+	char *word(int *len) {
 	    char c;
 	    char *p = word_buffer;
 	l1:
@@ -289,13 +262,13 @@ bufftop:
 	l3:
 	    if (key() != '\n') goto l3;
 	    goto l1;
-	} 
+	}
         */
 
 	.text
 _WORD:
 	PUSH	LR
-1:	
+1:
 	BL	_KEY		// read next char into X0
 	CMP	X0, '\\'
 	B.EQ	3f
@@ -326,9 +299,9 @@ word_buffer:
 
 
 	// ( addr length -- n e ) convert string -> number
-	// n: parsed number, e: number of unparsed characters	
+	// n: parsed number, e: number of unparsed characters
 	// fixme: "1a" is not same as "1A" - perhaps leaves unparsed characters?
-	
+
 	.text
 _NUMBER:
 	PUSH	LR
@@ -336,7 +309,7 @@ _NUMBER:
 	MOV	X0, #0			// result after conversion
 	CMP	X1, #0
 	B.LE	5f			// error if length <= 0
-	
+
 	KLOAD	X3, var_BASE
 	LDR	X3, [X3]		// X3 = BASE
 //	MOV	X3, #10
@@ -375,11 +348,11 @@ _NUMBER:
 4:
 	CMP	X5, #1			// number is negative if X5==1
 	B.NE	5f
-	NEG	X0, X0			
+	NEG	X0, X0
 5:
 	POP	LR
 	RET
-	
+
 	.text
 _EMIT:
 	PUSH	X1
@@ -398,12 +371,12 @@ _EMIT:
 	.data			// NB: easier to fit in the .data section
 emit_buf:
 	.space 1		// buffer used by EMIT
-	
+
 	.text
 _CR:
 	KPRINT  "\n"
 	RET
-	
+
 	.text
 _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 	MOV	X0, #1		// 1 = stdout
@@ -411,10 +384,10 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 	SVC 	0
 	RET
 
-//--------------------------------------------------	
+//--------------------------------------------------
 // 	Dictionary
-//--------------------------------------------------	
-	
+//--------------------------------------------------
+
 	// X0 = address
 	// X1 = length
 	// X2 = copy of X0
@@ -428,7 +401,7 @@ _FIND:
 	KLOAD	X4, var_LATEST
 1:	LDR	X4, [X4]
 	MOV	X3, X1
-	ADDS	X5, XZR, X4	
+	ADDS	X5, XZR, X4
 	B.EQ	3f		// end of dictionary
 	MOV	X7, #0
 	LDRB	W7, [X5, #8]!	// load length + flags
@@ -451,7 +424,7 @@ _TCFA:	MOV	X2, #0
 	LDRB	W2, [X0, #8]!	// skip link pointer and load length + flags
 	AND	W2, W2, F_LENMASK // strip the flags
 	ADD	X1, X0, X2	// skip characters
-	ADD	X1, X1, #8	// skip length byte (1) and add 7 
+	ADD	X1, X1, #8	// skip length byte (1) and add 7
 	AND	X1, X1, #-7	// ... to make it 8-byte aligned
 	LDR	X0, [X1]
 	RET
@@ -479,14 +452,14 @@ _CREATE:
 	STR	X3, [X4]	// HERE = X3
 	RET
 
-	// X0 = code pointer to store 
+	// X0 = code pointer to store
 _COMMA:
 	KLOAD	X2, var_HERE
 	LDR	X1, [X2]	// X1 = HERE
 	STR	X0, [X1], #8	// *X1++ = X0
 	STR	X1, [X2]	// HERE = X1
 	RET
-	
+
 	.text
 _set_up_data_segment:
 	KLOAD 	X0, var_HERE
@@ -494,13 +467,42 @@ _set_up_data_segment:
 	STR 	X1, [X0]
 	RET
 
+	;; Initalize random number generator 
+	;; Here, we read a 64-bit word from /dev/urandom
+	;; and put it in var_RNDSEED
+_RANDOMIZE:
+	MOV	X0, #-2		; AT_FDCWD
+	KLOAD 	X1, urandom
+	MOV	X2, #0		; O_RDONLY
+	MOV	X3, #0666	; S_RDWR
+	MOV	X16, #SYS_openat
+	SVC	0
+	ADDS	X11, XZR, X0
+	B.PL	3f
+	KPRINT  "Error: could not open /dev/urandom\n"
+	B	_HALT
+3:	
+	MOV	X0, X11
+	KLOAD	X1, var_RNDSEED
+	MOV	X2, #4
+	MOV	X16, #SYS_read
+	SVC	0
+	RET
+	
+	
+
+urandom:
+	.asciz "/dev/urandom"
+	
+	.align 4
+
 
 _PRINTWORD:
 	// X1 -> beginning of dictionary entry
 	CMP X1, #0
 	BNE 1f
 	RET
-1:	
+1:
 	PUSH X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
 	KPRINT "start:    "
 	MOV X0, X1
@@ -510,12 +512,12 @@ _PRINTWORD:
 	LDR X0, [X1], #8
 	BL printhex
 	BL _CR
-	
+
 	KPRINT "length:   "
 	MOV X0, #0
 	LDRB W0, [X1]
 	AND W0, W0, F_LENMASK	// length
-	MOV X2, X0	// len	
+	MOV X2, X0	// len
 	BL printhex
 
 	KPRINT ", immediate="
@@ -532,7 +534,7 @@ _PRINTWORD:
 	ADD    W0, W0, '0'
 	BL     _EMIT
 	BL     _CR
-	
+
 	KPRINT "name:     "
 	MOV X3, X1
 	MOV X0, #1	// stdout
@@ -554,20 +556,20 @@ _PRINTWORD:
 MTEST2:
 	.quad 	_LIT
 	.quad	4
-	.quad 	QUADRUPLE	
-	.quad 	DOT		
+	.quad 	QUADRUPLE
+	.quad 	DOT
 	.quad 	HALT
-	.quad 	EXIT		
-	
+	.quad 	EXIT
+
 MTEST3:
 	.quad 	_LIT
 	.quad	2
 	.quad	_LIT
 	.quad 	3
-	.quad 	TIMES	
-	.quad 	DOT		
+	.quad 	TIMES
+	.quad 	DOT
 	.quad 	HALT
-	.quad 	EXIT		
+	.quad 	EXIT
 
 MTEST4:
 	.quad 	_LIT
@@ -593,7 +595,7 @@ MTEST6:
 	.quad 	EMIT
 	.quad	HALT
 	.quad	EXIT
-	
+
 MTEST7:
 	.quad 	KEY // 1
 	.quad	EMIT
@@ -635,13 +637,13 @@ MTEST9:
 	.quad	DOT
 	.quad	HALT
 	.quad	EXIT
-	
+
 MTEST10:
 	.quad	RZ
 	.quad	DOT
 	.quad	HALT
-	
-MTEST11:	
+
+MTEST11:
 	.quad	BASE
 	.quad 	FETCH
 	.quad	DOT
@@ -657,12 +659,12 @@ MTEST12:
 	.quad	FIND		// get dictionary address of first word
 	.quad 	DUP		// make 2 copies
 	.quad 	DUP
-	.quad	PRINTWORD	
+	.quad	PRINTWORD
 	.quad	DOT		// print address of dictionary entry
 	.quad 	TCFA
 	.quad	DOT		// print code field address
 	.quad 	TDFA
-	.quad	DOT		// print data field 
+	.quad	DOT		// print data field
 	.quad	HALT
 
 MTEST13:
@@ -693,18 +695,45 @@ MTEST15:
 	.quad	PRINTWORD
 	.quad	HALT
 
-MTEST16:	
+MTEST16:
 	.quad	WORD
 	.quad	FIND
 	.quad	PRINTWORD
-	.quad 	TICK
+	.quad TICK
 	.quad	DUP	// doesn't work: TICK returns address of DUP's codeword, not dict entry
 	.quad	PRINTWORD
-	
 	.quad	HALT
-	
+
+MTEST17:
+	.quad _LIT
+	.quad 255
+	.quad _LIT
+	.quad 10
+	.quad DIVMOD
+	.quad DOT
+	.quad DOT
+	.quad RND
+	.quad DUP
+	.quad DOT
+	.quad _LIT
+	.quad 10
+	.quad DIVMOD
+	.quad DOT
+	.quad DOT
+	.quad HALT
+
+MTEST18:			; generate random number between 0 and 100
+	.quad RANDOMIZE
+	.quad RND
+	.quad _LIT
+	.quad 100
+	.quad DIVMOD
+	.quad DROP
+	.quad DOT
+	.quad HALT
+
+
 	// The BSS segment won't add to the binary's size
 	.bss
-data_segment:	
+data_segment:
 	.space INITIAL_DATA_SEGMENT_SIZE
-	

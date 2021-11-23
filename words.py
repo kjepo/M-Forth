@@ -99,103 +99,127 @@ prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT
 prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])   # ( -- ) print carriage return
 
 prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
-     "POP  X0",
-     "LDR  X0, [X0]",
-     "PUSH X0",
-     "NEXT"])
+    "POP  X0",
+    "LDR  X0, [X0]",
+    "PUSH X0",
+    "NEXT"])
 
 prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string  
-     "POP  X1",
-     "POP  X0",
-     "BL   _FIND",
-     "PUSH X4",
-     "NEXT"])
+    "POP  X1",
+    "POP  X0",
+    "BL   _FIND",
+    "PUSH X4",
+    "NEXT"])
 
 prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
 
 prev = mkcode("PRINTWORD", "PRINTWORD", [    # ( addr -- ) prints info on dictionary entry
-     "POP  X1",
-     "BL   _PRINTWORD",
-     "PUSH X1",
-     "NEXT"])
+    "POP  X1",
+    "BL   _PRINTWORD",
+    "PUSH X1",
+    "NEXT"])
 
 prev = mkcode("CREATE", "CREATE", [    # ( addr length -- ) creates header for word
-     "POP X1",		# length
-     "POP X0",		# addr
-     "BL  _CREATE",
-     "NEXT"])
+    "POP X1",		# length
+    "POP X0",		# addr
+    "BL  _CREATE",
+    "NEXT"])
 
 prev = mkcode(",", "COMMA", [	  # ( n -- ) write n into HERE, increment HERE
-     "POP X0",
-     "BL  _COMMA",
-     "NEXT"])
+    "POP X0",
+    "BL  _COMMA",
+    "NEXT"])
 
 prev = mkcode("[", "_LBRAC", [    # ( -- ) sets STATE=0 (immediate mode)
-     "KLOAD X0, var_STATE",
-     "MOV   X1, #0",
-     "STR   X1, [X0]",
-     "NEXT"], "F_IMMED")
+    "KLOAD X0, var_STATE",
+    "MOV   X1, #0",
+    "STR   X1, [X0]",
+    "NEXT"], "F_IMMED")
 
 
 prev = mkcode("]", "_RBRAC", [    # ( -- ) sets STATE=1 (compile mode)
-     "KLOAD X0, var_STATE",
-     "MOV   X1, #1",
-     "STR X1, [X0]",
-     "NEXT"])
+    "KLOAD X0, var_STATE",
+    "MOV   X1, #1",
+    "STR X1, [X0]",
+    "NEXT"])
 
 prev = mkcode("HIDDEN", "HIDDEN", [  	  # ( addr -- ) toggle HIDDEN bit in dictionary entry
-     "POP  X0",          	  # dictionary entry
-     "ADD  X0, X0, #8",
-     "LDRB W1, [X0]",		  # get length/flags byte
-     "EOR  W1, W1, F_HIDDEN",	  # toggle the HIDDEN bit
-     "STRB W1, [X0]",
-     "NEXT"])
+    "POP  X0",          	  # dictionary entry
+    "ADD  X0, X0, #8",
+    "LDRB W1, [X0]",		  # get length/flags byte
+    "EOR  W1, W1, F_HIDDEN",	  # toggle the HIDDEN bit
+    "STRB W1, [X0]",
+    "NEXT"])
 
 # ( -- ) toggle IMMED bit for latest dictionary entry
 prev = mkcode("IMMEDIATE", "IMMEDIATE", [ 
-     "KLOAD X0, var_LATEST",
-     "LDR   X0, [X0]",		  # X0 = LATEST
-     "ADD   X0, X0, #8",
-     "LDRB  W1, [X0]",		  # get length/flag byte
-     "EOR   W1, W1, F_IMMED",	  # toggle IMMED bit
-     "STRB  W1, [X0]",
-     "NEXT" ], "F_IMMED")
+    "KLOAD X0, var_LATEST",
+    "LDR   X0, [X0]",		  # X0 = LATEST
+    "ADD   X0, X0, #8",
+    "LDRB  W1, [X0]",		  # get length/flag byte
+    "EOR   W1, W1, F_IMMED",	  # toggle IMMED bit
+    "STRB  W1, [X0]",
+    "NEXT" ], "F_IMMED")
 
 # ( -- addr ) get codeword pointer of next word
 # Common usage is ' FOO , which appends the codeword FOO to the current word
 # Note: this only works in compiled mode
 prev = mkcode("'", "TICK", [
-     "LDR  X0, [X8], #8",
-     "PUSH X0",
-     "NEXT" ])
+    "LDR  X0, [X8], #8",
+    "PUSH X0",
+    "NEXT" ])
 
 # add the offset to the instruction pointer
 prev = mkcode("BRANCH", "BRANCH", [ "LDR X0, [X8]", "ADD X8, X8, X0", "NEXT" ])
 
 prev = mkcode("0BRANCH", "ZBRANCH", [
-     "POP  X0",
-     "CMP  X0, #0",		# top of stack == 0 ?
-     "B.EQ code_BRANCH",	# if so, jump back to the branch function above
-     "LDR  X0, [X8], #8",	# otherwise, skip the offset
-     "NEXT "])
+    "POP  X0",
+    "CMP  X0, #0",		# top of stack == 0 ?
+    "B.EQ code_BRANCH",	# if so, jump back to the branch function above
+    "LDR  X0, [X8], #8",	# otherwise, skip the offset
+    "NEXT" ])
+
+# /MOD ( a b -- c d ) where c = a%b and d=a/b
+prev = mkcode("/MOD", "DIVMOD", [
+    "POP  X0",           # X0 = b
+    "POP  X1",           # X1 = a
+    "UDIV X2, X1, X0",   # X2 = a/b
+    "MUL  X3, X0, X2",   # X3 = b*(a/b)
+    "SUB  X0, X1, X3",   # X0 = a - b*(a/b)
+    "PUSH X0",           # push remainder
+    "PUSH X2",           # push quotient
+    "NEXT" ])
 
 
+# RND ( -- n ) generate a 64-bit random number
+prev = mkcode("RND", "RND", [
+    "KLOAD X1, var_RNDSEED",        # get current state
+    "LDR X0, [X1]",
+    "EOR X0, X0, X0, LSL #13",  # X0 ^= X0 << 13
+    "EOR X0, X0, X0, LSR #7",   # X0 ^= X0 >> 7
+    "EOR X0, X0, X0, LSL #17",  # X0 ^= X0 << 17
+    "PUSH X0",
+    "STR X0, [X1]",
+    "NEXT" ])
+
+# RANDOMIZE ( -- ) initiate random number seed
+prev = mkcode("RANDOMIZE", "RANDOMIZE", [ "BL _RANDOMIZE", "NEXT" ])
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
 
 prev = mkword(":", "COLON", [ 	        # start word definition
-     "WORD",				# get the name of the word
-     "CREATE",	   		        # CREATE the new dictionary entry/header
-     "_LIT", "DOCOL", "COMMA", 	  	# append DOCOL (the codeword)
-     "_LATEST", "FETCH", "HIDDEN",      # make the word hidden
-     "_RBRAC", "EXIT" ]) 		# go into compile mode
+    "WORD",				# get the name of the word
+    "CREATE",	   		        # CREATE the new dictionary entry/header
+    "_LIT", "DOCOL", "COMMA", 	  	# append DOCOL (the codeword)
+    "_LATEST", "FETCH", "HIDDEN",      # make the word hidden
+    "_RBRAC", "EXIT" ]) 		# go into compile mode
 
 prev = mkword(";", "SEMICOLON", [	# finish word definition 
-     "_LIT", "EXIT", "COMMA",		# append EXIT (so the word will return)
-     "_LATEST", "FETCH", "HIDDEN",	# toggle hidden flag -- unhide the word
-     "_LBRAC", "EXIT" ], "F_IMMED")	# go back to IMMEDIATE mode
+    "_LIT", "EXIT", "COMMA",		# append EXIT (so the word will return)
+    "_LATEST", "FETCH", "HIDDEN",	# toggle hidden flag -- unhide the word
+    "_LBRAC", "EXIT" ], "F_IMMED")	# go back to IMMEDIATE mode
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
@@ -204,5 +228,6 @@ prev = mkvar("STATE", "STATE")
 prev = mkvar("HERE", "HERE")
 prev = mkvar("S0", "SZ")
 prev = mkvar("BASE", "BASE", 10)
+prev = mkvar("RNDSEED", "RNDSEED", "0xACE1")  # can be initialized to any non-zero seed
 # substitute in the last entry for name_BASE below:
 prev = mkvar("LATEST", "_LATEST", "name_BASE")
