@@ -144,50 +144,51 @@ prev = mkcode("]", "_RBRAC", [    # ( -- ) sets STATE=1 (compile mode)
     "NEXT"])
 
 prev = mkcode("HIDDEN", "HIDDEN", [  	  # ( addr -- ) toggle HIDDEN bit in dictionary entry
-    "POP  X0",          	  # dictionary entry
+    "POP  X0",                            # dictionary entry
     "ADD  X0, X0, #8",
-    "LDRB W1, [X0]",		  # get length/flags byte
-    "EOR  W1, W1, F_HIDDEN",	  # toggle the HIDDEN bit
+    "LDRB W1, [X0]",                      # get length/flags byte
+    "EOR  W1, W1, F_HIDDEN",              # toggle the HIDDEN bit
     "STRB W1, [X0]",
     "NEXT"])
 
 # ( -- ) toggle IMMED bit for latest dictionary entry
 prev = mkcode("IMMEDIATE", "IMMEDIATE", [ 
     "KLOAD X0, var_LATEST",
-    "LDR   X0, [X0]",		  # X0 = LATEST
+    "LDR   X0, [X0]",		              # X0 = LATEST
     "ADD   X0, X0, #8",
-    "LDRB  W1, [X0]",		  # get length/flag byte
-    "EOR   W1, W1, F_IMMED",	  # toggle IMMED bit
+    "LDRB  W1, [X0]",                     # get length/flag byte
+    "EOR   W1, W1, F_IMMED",	          # toggle IMMED bit
     "STRB  W1, [X0]",
     "NEXT" ], "F_IMMED")
 
 # ( -- addr ) get codeword pointer of next word
-# Common usage is ' FOO , which appends the codeword FOO to the current word
+# Common usage is ' FOO , which buries the address of FOO into the current word
 # Note: this only works in compiled mode
 prev = mkcode("'", "TICK", [
-    "LDR  X0, [X8], #8",
+    "LDR  X0, [X8], #8",        # X0 = *(IP+8)
     "PUSH X0",
     "NEXT" ])
 
 # add the offset to the instruction pointer
 prev = mkcode("BRANCH", "BRANCH", [ "LDR X0, [X8]", "ADD X8, X8, X0", "NEXT" ])
 
+# 0BRANCH is the same as BRANCH but the branch happens conditionally
 prev = mkcode("0BRANCH", "ZBRANCH", [
     "POP  X0",
-    "CMP  X0, #0",		# top of stack == 0 ?
-    "B.EQ code_BRANCH",	# if so, jump back to the branch function above
-    "LDR  X0, [X8], #8",	# otherwise, skip the offset
+    "CMP  X0, #0",              # top of stack == 0 ?
+    "B.EQ code_BRANCH",         # if so, jump back to the branch function above
+    "LDR  X0, [X8], #8",        # otherwise, skip the offset
     "NEXT" ])
 
 # /MOD ( a b -- c d ) where c = a%b and d=a/b
 prev = mkcode("/MOD", "DIVMOD", [
-    "POP  X0",           # X0 = b
-    "POP  X1",           # X1 = a
-    "UDIV X2, X1, X0",   # X2 = a/b
-    "MUL  X3, X0, X2",   # X3 = b*(a/b)
-    "SUB  X0, X1, X3",   # X0 = a - b*(a/b)
-    "PUSH X0",           # push remainder
-    "PUSH X2",           # push quotient
+    "POP  X0",                  # X0 = b
+    "POP  X1",                  # X1 = a
+    "UDIV X2, X1, X0",          # X2 = a/b
+    "MUL  X3, X0, X2",          # X3 = b*(a/b)
+    "SUB  X0, X1, X3",          # X0 = a - b*(a/b)
+    "PUSH X0",                  # push remainder
+    "PUSH X2",                  # push quotient
     "NEXT" ])
 
 
@@ -205,21 +206,35 @@ prev = mkcode("RND", "RND", [
 # RANDOMIZE ( -- ) initiate random number seed
 prev = mkcode("RANDOMIZE", "RANDOMIZE", [ "BL _RANDOMIZE", "NEXT" ])
 
+# LITSTRING is a primitive used to implement the ." and S" operators (which are written in FORTH).
+prev = mkcode("LITSTRING", "_LITSTRING", [
+    "LDR   X0, [X8], #8",        # get the length of the string
+    "PUSH X8",                   # push addr of start of string
+    "PUSH X0",                   # push length of the string
+    "ADD X8, X0, X8",            # skip past the string
+    "ADD X8, X8, #7",            # align to next 8 byte boundary
+    "AND X8, X8, #7",
+    "NEXT" ])
+
+
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
 
-prev = mkword(":", "COLON", [ 	        # start word definition
-    "WORD",				# get the name of the word
-    "CREATE",	   		        # CREATE the new dictionary entry/header
-    "_LIT", "DOCOL", "COMMA", 	  	# append DOCOL (the codeword)
-    "_LATEST", "FETCH", "HIDDEN",      # make the word hidden
-    "_RBRAC", "EXIT" ]) 		# go into compile mode
+prev = mkword(":", "COLON", [ 	    # start word definition
+    "WORD",                         # get the name of the word
+    "CREATE",                       # CREATE the new dictionary entry/header
+    "_LIT", "DOCOL", "COMMA",       # append DOCOL (the codeword)
+    "_LATEST", "FETCH", "HIDDEN",   # make the word hidden
+    "_RBRAC", "EXIT" ])             # go into compile mode
 
 prev = mkword(";", "SEMICOLON", [	# finish word definition 
     "_LIT", "EXIT", "COMMA",		# append EXIT (so the word will return)
     "_LATEST", "FETCH", "HIDDEN",	# toggle hidden flag -- unhide the word
     "_LBRAC", "EXIT" ], "F_IMMED")	# go back to IMMEDIATE mode
+
+# set hidden flag in current word
+prev = mkword("HIDE", "HIDE", [ "WORD", "FIND", "HIDDEN", "EXIT" ])
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")

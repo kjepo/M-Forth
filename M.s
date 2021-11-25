@@ -51,9 +51,9 @@
 //
 // M Forth register usage:
 // 	X0 contains the current codeword when going from NEXT to DOCOL
-// 	X8 is the instruction pointer       (%esi in Jones Forth)
-//	X9 is the return stack pointer      (%ebp in Jones Forth)
-// 	SP (X13) is the data stack pointer  (%esp in Jones Forth)
+// 	X8 is the instruction pointer (IP)       (%esi in Jones Forth)
+//	X9 is the return stack pointer (SP)      (%ebp in Jones Forth)
+// 	SP (X13) is the data stack pointer (RSP) (%esp in Jones Forth)
 
 
 // On MacOS you can't use ADR to load an address into the register,
@@ -424,7 +424,7 @@ _TCFA:	MOV	X2, #0
 	LDRB	W2, [X0, #8]!	// skip link pointer and load length + flags
 	AND	W2, W2, F_LENMASK // strip the flags
 	ADD	X1, X0, X2	// skip characters
-	ADD	X1, X1, #8	// skip length byte (1) and add 7
+  ADD	X1, X1, #8	// skip length byte (1) and add 7
 	AND	X1, X1, #-7	// ... to make it 8-byte aligned
 	LDR	X0, [X1]
 	RET
@@ -440,7 +440,8 @@ _CREATE:
 	STR	X2, [X3], #8 	// *X3++ = LATEST
 	MOV	X7, X3
 	STRB	W1, [X3], #1	// *X3++ = length
-1:	LDRB	W2, [X0], #1	// *X3++ = *X0++
+1:
+  LDRB	W2, [X0], #1	// *X3++ = *X0++
 	STRB	W2, [X3], #1
 	SUBS	X1, X1, #1
 	B.NE	1b
@@ -454,48 +455,45 @@ _CREATE:
 
 	// X0 = code pointer to store
 _COMMA:
-	KLOAD	X2, var_HERE
-	LDR	X1, [X2]	// X1 = HERE
-	STR	X0, [X1], #8	// *X1++ = X0
-	STR	X1, [X2]	// HERE = X1
+	KLOAD	  X2, var_HERE
+	LDR	    X1, [X2]	            ; X1 = HERE
+	STR	    X0, [X1], #8	        ; *X1++ = X0
+	STR	    X1, [X2]	            ; HERE = X1
 	RET
 
 	.text
 _set_up_data_segment:
 	KLOAD 	X0, var_HERE
 	KLOAD 	X1, data_segment
-	STR 	X1, [X0]
+	STR 	  X1, [X0]
 	RET
 
-	;; Initalize random number generator 
+	;; Initalize random number generator
 	;; Here, we read a 64-bit word from /dev/urandom
 	;; and put it in var_RNDSEED
 _RANDOMIZE:
-	MOV	X0, #-2		; AT_FDCWD
+	MOV	X0, #-2		              ; AT_FDCWD
 	KLOAD 	X1, urandom
-	MOV	X2, #0		; O_RDONLY
-	MOV	X3, #0666	; S_RDWR
-	MOV	X16, #SYS_openat
-	SVC	0
-	ADDS	X11, XZR, X0
-	B.PL	3f
+	MOV	    X2, #0		          ; O_RDONLY
+	MOV	    X3, #0666	          ; S_RDWR
+	MOV	    X16, #SYS_openat
+	SVC	    0
+	ADDS	  X11, XZR, X0
+	B.PL	  3f
 	KPRINT  "Error: could not open /dev/urandom\n"
 	B	_HALT
-3:	
+3:
 	MOV	X0, X11
 	KLOAD	X1, var_RNDSEED
 	MOV	X2, #4
 	MOV	X16, #SYS_read
 	SVC	0
 	RET
-	
-	
 
 urandom:
 	.asciz "/dev/urandom"
-	
-	.align 4
 
+	.align 4
 
 _PRINTWORD:
 	// X1 -> beginning of dictionary entry
