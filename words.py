@@ -61,7 +61,8 @@ prev = mkcode("DUP", "DUP", ["POP X0", "PUSH X0", "PUSH X0", "NEXT"])
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
 prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
-
+prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
+prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
@@ -170,7 +171,11 @@ prev = mkcode("'", "TICK", [
     "NEXT" ])
 
 # add the offset to the instruction pointer
-prev = mkcode("BRANCH", "BRANCH", [ "LDR X0, [X8]", "ADD X8, X8, X0", "NEXT" ])
+prev = mkcode("BRANCH", "BRANCH", [
+    "LDR X0, [X8]",
+    "ADD X8, X8, X0",
+    "NEXT"
+])
 
 # 0BRANCH is the same as BRANCH but the branch happens conditionally
 prev = mkcode("0BRANCH", "ZBRANCH", [
@@ -211,10 +216,24 @@ prev = mkcode("LITSTRING", "_LITSTRING", [
     "LDR   X0, [X8], #8",        # get the length of the string
     "PUSH X8",                   # push addr of start of string
     "PUSH X0",                   # push length of the string
+    "debug:",
     "ADD X8, X0, X8",            # skip past the string
-    "ADD X8, X8, #7",            # align to next 8 byte boundary
-    "AND X8, X8, #7",
     "NEXT" ])
+
+# TELL prints a string
+prev = mkcode("TELL", "TELL", [
+    "MOV X0, #1",               # stdout
+    "POP X2",                   # length of string
+    "POP X1",                   # addr of string
+    "MOV X16, #4",              # write system call
+    "SVC 0",
+    "NEXT" ])
+
+prev = mkcode("INTERPRET", "INTERPRET", [
+    "KPRINT \"INTERPRET...\"",
+    "BL _HALT",
+    "NEXT"
+])
 
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
@@ -235,6 +254,13 @@ prev = mkword(";", "SEMICOLON", [	# finish word definition
 
 # set hidden flag in current word
 prev = mkword("HIDE", "HIDE", [ "WORD", "FIND", "HIDDEN", "EXIT" ])
+
+# QUIT doesn't return, it just resets the return stack and calls the interpreter
+prev = mkword("QUIT", "QUIT", [
+    "RZ", "RSPSTORE",           # R0 RSP! - clear the return stack
+    "INTERPRET",                # interpret the next word
+    "BRANCH", "-16"             # ... and loop (indefinitely)
+    ])
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")

@@ -83,7 +83,7 @@
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST18
+	KLOAD	X8, MTEST20
 	NEXT				// won't return
 
 DOCOL:
@@ -425,7 +425,7 @@ _TCFA:	MOV	X2, #0
 	AND	W2, W2, F_LENMASK // strip the flags
 	ADD	X1, X0, X2	// skip characters
   ADD	X1, X1, #8	// skip length byte (1) and add 7
-	AND	X1, X1, #-7	// ... to make it 8-byte aligned
+	AND	X1, X1, ~7	// ... to make it 8-byte aligned
 	LDR	X0, [X1]
 	RET
 
@@ -446,7 +446,7 @@ _CREATE:
 	SUBS	X1, X1, #1
 	B.NE	1b
 	ADD	X3, X3, #7
-	AND	X3, X3, #-7
+	AND	X3, X3, ~7
 	KLOAD	X2, var_LATEST
 	STR	X5, [X2]	// LATEST = original HERE
 	KLOAD	X4, var_HERE
@@ -728,7 +728,28 @@ MTEST18:			; generate random number between 0 and 100
 	.quad DIVMOD
 	.quad DROP
 	.quad DOT
+  .quad BRANCH
+  .quad -64                     ; jump 64/8 == 8 instructions backwards
 	.quad HALT
+
+MTEST19:
+	.quad RZ
+  .quad DOT
+  .quad RZ
+  .quad RSPSTORE
+  .quad QUIT
+  .quad HALT
+
+MTEST20:
+  .quad _LITSTRING
+  .quad 5
+  .ascii "Hello"
+  .quad TELL
+  .quad _LITSTRING
+  .quad 7
+  .ascii " world\n"
+  .quad TELL
+  .quad HALT
 
 
 	// The BSS segment won't add to the binary's size
