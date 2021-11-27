@@ -32,40 +32,41 @@
 // The ARM is a load/store architecture, i.e., operations like adding, shifting, etc are
 // performed on registers and the only instructions interacting with memory are load/store.
 
-//	ARM Notes
-//	=========
-//
-//	SUB a, b, c <=> a = b - c
-//	RSB a, b, c <=> a = c - b
-//
-//	CMP a, b <=> flags (only!) for a - b
-//	SUBS a, b, c <=> a = b - c (and flags!)
-//
-//	LDR a, [b, #c]  <=> a = M[b + #c]
-//	LDR a, [b, #c]! <=> a = M[b + #c], b = b + #c
-//	LDR a, [b], #c  <=> a = M[b], b = b + #c
-//
+  ;; ARM Notes
+  ;; =========
+  ;;
+  ;; 	SUB a, b, c <=> a = b - c
+  ;; 	RSB a, b, c <=> a = c - b
+  ;;
+  ;; 	CMP a, b <=> flags (only!) for a - b
+  ;; 	SUBS a, b, c <=> a = b - c (and flags!)
+  ;;
+  ;; 	LDR a, [b, #c]  <=> a = M[b + #c]
+  ;; 	LDR a, [b, #c]! <=> a = M[b + #c], b = b + #c
+  ;; 	LDR a, [b], #c  <=> a = M[b], b = b + #c
+  ;;
+  ;;
+  ;; 2. M FORTH
+  ;;
+  ;; M Forth register usage:
+  ;; X0 contains the current codeword when going from NEXT to DOCOL
+	;; X1 is commonly used for storing a start address for a string
+  ;; X2 is commonly used for storing the length of the string
+  ;; X8 is the instruction pointer (IP)       (%esi in Jones Forth)
+  ;; X9 is the return stack pointer (SP)      (%ebp in Jones Forth)
+  ;; SP (X13) is the data stack pointer (RSP) (%esp in Jones Forth)
+  ;; 
 
-//
-// 2. M FORTH
-//
-// M Forth register usage:
-// 	X0 contains the current codeword when going from NEXT to DOCOL
-// 	X8 is the instruction pointer (IP)       (%esi in Jones Forth)
-//	X9 is the return stack pointer (SP)      (%ebp in Jones Forth)
-// 	SP (X13) is the data stack pointer (RSP) (%esp in Jones Forth)
+  ;; On MacOS you can't use ADR to load an address into the register,
+  ;; since a 64-bit address won't fit into a 32-bit instruction so
+  ;; this operation is done in two steps: first load the address of
+  ;; the page, then add the offset.  I guess it's possible to design
+  ;; a 32-bit FORTH by sticking to one 32-bit address space, but
+  ;; this is not something I have investigated.
 
-
-// On MacOS you can't use ADR to load an address into the register,
-// since a 64-bit address won't fit into a 32-bit instruction so
-// this operation is done in two steps: first load the address of
-// the page, then add the offset.  I guess it's possible to design
-// a 32-bit FORTH by sticking to one 32-bit address space, but
-// this is not something I have investigated.
-
-// footnote: this is how cc compiles it:
-//	adrp	x19, _buffer@GOTPAGE
-//	ldr	x19, [x19, _buffer@GOTPAGEOFF]
+  ;; footnote: this is how cc compiles it:
+  ;; adrp	x19, _buffer@GOTPAGE
+  ;; ldr	x19, [x19, _buffer@GOTPAGEOFF]
 
 	#include "kload.s"
 	#include "kprint.s"
@@ -83,7 +84,7 @@
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST20
+	KLOAD	X8, MTEST12
 	NEXT				// won't return
 
 DOCOL:
@@ -183,7 +184,8 @@ _HALT:
 
 /*
 	KEY reads the next byte from stdin and pushes it on the stack.
-	It uses a buffer and two pointers, buffer and bufftop.
+	The helper routine _KEY (below) returns the next byte in X0.
+  It uses a buffer and two pointers, buffer and bufftop.
 
 	#define BUFFER_SIZE 4096
 	char buffer[BUFFER_SIZE];
@@ -208,41 +210,43 @@ _HALT:
 
 _KEY:
 1:
-	KLOAD	X1, currkey
-	LDR	X2, [X1]	// X2 = currkey
-	KLOAD	X3, bufftop
-	LDR	X4, [X3]	// X4 = bufftop
-	CMP	X2, X4		// currkey == bufftop ?
-	B.GE	2f		// exhausted the input buffer?
-	MOV	X0, #0
-	LDRB	W0, [X2], #1	// W0 = *currkey++
-	STR	X2, [X1]
+	KLOAD	  X1, currkey
+	LDR	    X2, [X1]	            ; X2 = currkey
+	KLOAD	  X3, bufftop
+	LDR	    X4, [X3]	            ; X4 = bufftop
+	CMP	    X2, X4		            ; currkey == bufftop ?
+	B.GE	  2f		                ; exhausted the input buffer?
+	MOV	    X0, #0
+	LDRB	  W0, [X2], #1	        ; W0 = *currkey++
+	STR	    X2, [X1]
 	RET
-2:
-	// Out of input; use read(2) to fetch more input from stdin.
-	MOV	W0, 0		// stdin
-	KLOAD	X1, buffer
-	KLOAD	X2, currkey
-	STR	X1, [X2]	// currkey = buffer
-	MOV	X2, BUFFER_SIZE
-	MOV	X16, #3		// MacOS read system call
-	SVC	0
-	CMP	W0, 0		// returns with number of chars read
-	B.LE	_HALT		// <= 0 means EOF or error, so exit
-	KLOAD	X1, buffer
-	ADD	X0, X0, X1	// bufftop = X0 + buffer
-	KLOAD	X2, bufftop
-	STR	X0, [X2]
-	B	1b
+2:                              ; Out of input; use read(2) to fetch more input from stdin
+
+	MOV	    W0, 0		              ; stdin
+	KLOAD	  X1, buffer
+	KLOAD	  X2, currkey
+	STR	    X1, [X2]	            ; currkey = buffer
+	MOV	    X2, BUFFER_SIZE
+	MOV	    X16, #3		            ; MacOS read system call
+	SVC	    0
+	CMP	    W0, 0		              ; returns with number of chars read
+	B.LE	  _HALT		              ; <= 0 means EOF or error, so exit
+	KLOAD	  X1, buffer
+	ADD	    X0, X0, X1	          ; bufftop = X0 + buffer
+	KLOAD	  X2, bufftop
+	STR	    X0, [X2]
+	B	      1b
 
 	.data
 	.align 4
 currkey:
-	.quad 	buffer		// Current place in input buffer (next character to read).
+	.quad 	buffer		            ; Current place in input buffer (next character to read)
 bufftop:
-	.quad	buffer		// Last valid data in input buffer + 1.
+	.quad	  buffer		            ; Last valid data in input buffer + 1
 
-	/* WORD reads the next the full word of input
+	/*
+  WORD reads the next the full word of input
+  The helper routine _WORD (below) returns with X1 = start address, X2 = length
 
 	char word_buffer[32];
 
@@ -266,31 +270,31 @@ bufftop:
         */
 
 	.text
-_WORD:
+_WORD:                          ; returns with X1 = start address, X2 = length
 	PUSH	LR
 1:
-	BL	_KEY		// read next char into X0
-	CMP	X0, '\\'
+	BL	  _KEY                    ; read next char into X0
+	CMP 	X0, '\\'                ; comment?
 	B.EQ	3f
-	CMP	X0, ' '
-	B.EQ	1b
+	CMP	  X0, ' '
+	B.EQ	1b                      ; keep looking for non-space
 	KLOAD	X2, word_buffer
 2:
-	STRB	W0, [X2], #1	// *word_buffer++ = W0
+	STRB	W0, [X2], #1	          ; *word_buffer++ = W0
 	PUSH	X2
-	BL	_KEY
-	POP	X2
-	CMP	X0, ' '
+	BL	  _KEY
+	POP	  X2
+	CMP	  X0, ' '
 	B.NE	2b
 	KLOAD	X1, word_buffer
-	SUB	X0, X2, X1
-	POP	LR
+	SUB	  X2, X2, X1              ; X2 = length
+	POP	  LR
 	RET
-3:				// consume comment until EOL
-	BL	_KEY
-	CMP	X0, '\n'
+3:				                      ; consume comment until EOL
+	BL	  _KEY
+	CMP	  X0, '\n'
 	B.NE	3b
-	B	1b
+	B	    1b
 
 	.data
 word_buffer:
@@ -388,69 +392,76 @@ _EMITWORD:			// upon entering: X1 = buffer, X2 = length
 // 	Dictionary
 //--------------------------------------------------
 
-	// X0 = address
-	// X1 = length
-	// X2 = copy of X0
-	// X3 = copy of X1
-	// X4 = current dictionary word
-	// X5 = copy of X4
-	// X6 = character in X0 string
-	// X7 = character in X4 string, also len
-	// return with X0 = addr of word
-_FIND:
-	KLOAD	X4, var_LATEST
-1:	LDR	X4, [X4]
-	MOV	X3, X1
-	ADDS	X5, XZR, X4
-	B.EQ	3f		// end of dictionary
-	MOV	X7, #0
-	LDRB	W7, [X5, #8]!	// load length + flags
-	AND	W7, W7, F_HIDDEN|F_LENMASK	// W7 = name length
-	CMP	W7, W1
-	B.NE	1b		// different lengths, try previous word
-	MOV	X2, X0		// copy address
-	ADD	X5, X5, #1	// X5 points to beginning of dictionary string
-2:	LDRB	W6, [X5], #1 	// compare strings, character by character
-	LDRB	W7, [X2], #1
-	CMP	W6, W7
-	B.NE	1b		// not same, try previous word
-	SUBS	W3, W3, #1
-	B.GT	2b		// still more characters to compare
-3:	RET			// return with X4 -> dictionary header
+  ;; FIND dictionary entry, given string
+  ;; X1 = address of string
+  ;; X2 = length of string 
+	;; FIND uses:
+  ;; X0 = copy of X1
+  ;; X3 = copy of X1
+	;; X4 = current dictionary word
+	;; X5 = copy of X4
+	;; X6 = character in X0 string
+	;; X7 = character in X4 string, also len
+	;; FIND returns with X4 = addr of dictionary entry, or 0 if not found
 
-	// return the code field address in X1
-	// X0 - address of dictionary header
-_TCFA:	MOV	X2, #0
-	LDRB	W2, [X0, #8]!	// skip link pointer and load length + flags
-	AND	W2, W2, F_LENMASK // strip the flags
-	ADD	X1, X0, X2	// skip characters
-  ADD	X1, X1, #8	// skip length byte (1) and add 7
-	AND	X1, X1, ~7	// ... to make it 8-byte aligned
-	LDR	X0, [X1]
+_FIND:
+  KLOAD   X4, var_LATEST
+1:
+  LDR     X4, [X4]
+  MOV     X3, X2                     ; X3 = length
+  ADDS    X5, XZR, X4                ;
+  B.EQ    3f                         ; end of dictionary
+	MOV     X7, #0
+  LDRB    W7, [X5, #8]!              ; load length + flags
+  AND     W7, W7, F_HIDDEN|F_LENMASK ; W7 = name length
+  CMP     W7, W2
+  B.NE    1b
+  MOV     X0, X1                     ; X0 = copy of start address
+  ADD     X5, X5, #1                 ; X5 = pointer to beginning of dictionary string
+2:
+  LDRB    W6, [X5], #1               ; compare strings, char by char
+  LDRB    W7, [X0], #1
+  CMP     W6, W7
+  B.NE    1b                         ; not same, try previous word
+  SUBS    W3, W3, #1
+  B.GT    2b                         ; still more characters to compare
+3:
+  RET                                ; return with X4 -> dictionary header
+
+  ;; return the code field address in X1
+  ;; X0 - address of dictionary header
+_TCFA:
+  MOV	    X2, #0
+	LDRB	  W2, [X0, #8]!         ; skip link pointer and load length + flags
+	AND	    W2, W2, F_LENMASK     ; strip the flags
+	ADD	    X1, X0, X2	          ; skip characters
+  ADD	    X1, X1, #8	          ; skip length byte (1) and add 7
+	AND	    X1, X1, ~7	          ; ... to make it 8-byte aligned
+	LDR	    X0, [X1]
 	RET
 
 	// X1: length
 	// X0: address of name
 _CREATE:
-	KLOAD	X2, var_LATEST
-	LDR	X2, [X2]	// X2 = LATEST = latest dictionary entry
-	KLOAD	X3, var_HERE
-	LDR	X3, [X3]	// X3 = HERE = next available place in data segment
-	MOV	X5, X3		// X5 = copy of original HERE
-	STR	X2, [X3], #8 	// *X3++ = LATEST
-	MOV	X7, X3
-	STRB	W1, [X3], #1	// *X3++ = length
+	KLOAD	  X2, var_LATEST
+	LDR	    X2, [X2]	            ; X2 = LATEST = latest dictionary entry
+	KLOAD	  X3, var_HERE
+	LDR	    X3, [X3]	            ; X3 = HERE = next available place in data segment
+	MOV	    X5, X3		            ; X5 = copy of original HERE
+	STR	    X2, [X3], #8 	        ; *X3++ = LATEST
+	MOV	    X7, X3
+	STRB	  W1, [X3], #1	        ; *X3++ = length
 1:
-  LDRB	W2, [X0], #1	// *X3++ = *X0++
-	STRB	W2, [X3], #1
-	SUBS	X1, X1, #1
-	B.NE	1b
-	ADD	X3, X3, #7
-	AND	X3, X3, ~7
-	KLOAD	X2, var_LATEST
-	STR	X5, [X2]	// LATEST = original HERE
-	KLOAD	X4, var_HERE
-	STR	X3, [X4]	// HERE = X3
+  LDRB  	W2, [X0], #1
+	STRB	  W2, [X3], #1
+	SUBS	  X1, X1, #1
+	B.NE	  1b
+	ADD	    X3, X3, #7
+	AND	    X3, X3, ~7
+	KLOAD	  X2, var_LATEST
+	STR	    X5, [X2]	// LATEST = original HERE
+	KLOAD	  X4, var_HERE
+	STR	    X3, [X4]	// HERE = X3
 	RET
 
 	// X0 = code pointer to store
@@ -461,7 +472,28 @@ _COMMA:
 	STR	    X1, [X2]	            ; HERE = X1
 	RET
 
+_INTERPRET:
+	PUSH    LR
+  MOV     X1, #0
+  KLOAD   X3, interpret_is_lit
+  STR     X1, [X3]              ; interpret_is_lit = 0
+  BL      _WORD                 ; returns with X0 = length, X1 = start address
+  BL      _FIND                 ; returns with X0 = pointer to header, or 0 if not found
+  MOV     X1, X4
+  BL      _PRINTWORD
+
+  POP     LR
+	RET
+
+	.data
+  .align  4
+interpret_is_lit:               ; flag used to record if reading a literal
+  .quad   0
+
+
 	.text
+  .align  4
+
 _set_up_data_segment:
 	KLOAD 	X0, var_HERE
 	KLOAD 	X1, data_segment
@@ -720,7 +752,7 @@ MTEST17:
 	.quad DOT
 	.quad HALT
 
-MTEST18:			; generate random number between 0 and 100
+MTEST18:                        ; generate randoms number between 0 and 100
 	.quad RANDOMIZE
 	.quad RND
 	.quad _LIT
@@ -733,8 +765,6 @@ MTEST18:			; generate random number between 0 and 100
 	.quad HALT
 
 MTEST19:
-	.quad RZ
-  .quad DOT
   .quad RZ
   .quad RSPSTORE
   .quad QUIT
@@ -750,6 +780,23 @@ MTEST20:
   .ascii " world\n"
   .quad TELL
   .quad HALT
+
+MTEST21:                        ; print all integers from 9 .. 0
+  .quad _LIT
+  .quad 10                      ; 10
+  .quad _LIT                    ; 10  <-------,
+  .quad -1                      ; 10 -1       |
+  .quad PLUS                    ; 9           |
+  .quad DUP                     ; 9 9         |
+  .quad DOT                     ; 9           |
+	.quad DUP                     ; 9 9         |
+  .quad ZBRANCH                 ; 9           |
+  .quad 3*8                     ; ----,       |
+  .quad BRANCH                  ;     |       |
+  .quad -9*8                    ; ----+-------'
+  .quad HALT                    ; <---'
+
+
 
 
 	// The BSS segment won't add to the binary's size

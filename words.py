@@ -86,7 +86,7 @@ prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X0, X1", "CSETM X0, NE", "P
 prev = mkcode("KEY", "KEY", ["BL _KEY", "PUSH X0", "NEXT"])
 
 # WORD ( -- addr n ) where n is length of string starting at addr
-prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X0", "NEXT"])
+prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X2", "NEXT"])
 
 # NUMBER ( addr length -- n e ) convert string -> number: n is parsed number, e is nr of unparsed chars
 prev = mkcode("NUMBER", "NUMBER", ["POP X1", "POP X0", "BL _NUMBER", "PUSH X0", "PUSH X1", "NEXT"])
@@ -105,9 +105,9 @@ prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
     "PUSH X0",
     "NEXT"])
 
-prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string  
-    "POP  X1",
-    "POP  X0",
+prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string
+    "POP  X2",                      # X1 = length
+    "POP  X1",                      # X0 = addr
     "BL   _FIND",
     "PUSH X4",
     "NEXT"])
@@ -216,7 +216,6 @@ prev = mkcode("LITSTRING", "_LITSTRING", [
     "LDR   X0, [X8], #8",        # get the length of the string
     "PUSH X8",                   # push addr of start of string
     "PUSH X0",                   # push length of the string
-    "debug:",
     "ADD X8, X0, X8",            # skip past the string
     "NEXT" ])
 
@@ -229,12 +228,8 @@ prev = mkcode("TELL", "TELL", [
     "SVC 0",
     "NEXT" ])
 
-prev = mkcode("INTERPRET", "INTERPRET", [
-    "KPRINT \"INTERPRET...\"",
-    "BL _HALT",
-    "NEXT"
-])
-
+# INTERPRET is the top loop of the FORTH system
+prev = mkcode("INTERPRET", "INTERPRET", [ "BL _INTERPRET", "NEXT" ])
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
