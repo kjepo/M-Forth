@@ -4,7 +4,7 @@ prev = "0"
 
 def header(name, label, flags):
     print("\t.data")
-    print("\t.align 3")
+    print("\t.balign 8")
     print("\t.globl name_" + label)
     print("name_" + label + ":")
     print("\t.quad " + prev)
@@ -13,7 +13,7 @@ def header(name, label, flags):
     else:
         print("\t.byte " + str(len(name)))
     print("\t.ascii \"" + name + "\"")
-    print("\t.align 3")         # should be 8? fixit
+    print("\t.balign 8")         # should be 8? fixit
     print("\t.globl " + label)
     print(label + ":")
 
@@ -52,7 +52,7 @@ def mkvar(name, label, initial=0, flags=0):
 		 "PUSH X0",
 		 "NEXT",
 		 ".data",
-		 ".align 3",
+		 ".balign 8",
 		 "var_" + name + ":",
 		 ".quad " + str(initial)
 		 ], flags)
@@ -98,10 +98,11 @@ prev = mkcode("NUMBER", "NUMBER", ["POP X1", "POP X0", "BL _NUMBER", "PUSH X0", 
 # EMIT ( a -- ) emit top of stack as ASCII
 prev = mkcode("EMIT", "EMIT", ["POP X0", "BL _EMIT", "NEXT"])
 
-# fixme: rewrite this as a mkword using _LIT 10, EMIT
 prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT"])
 
-prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])   # ( -- ) print carriage return
+# fixme: rewrite this as a mkword using _LIT 10, EMIT
+#prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])   # ( -- ) print carriage return
+
 
 prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
     "POP  X0",

@@ -86,7 +86,7 @@
   .endm
 
   .global _main                 ; Provide program starting address to linker
-  .align 3                      ; MacOS (and see footnote on align further up)
+  .balign 8                     ; MacOS (and see footnote on align further up)
 _main:
   BL  _set_up_data_segment
   KLOAD X9, return_stack_top
@@ -108,7 +108,7 @@ DOCOL:
         .set    link, 0
 
   .text
-  .align 3
+  .balign 8
 printhex:
   // printhex -- print reg X0 as 16 char hex string 000000000000002A
   // X1: pointer to output buffer hexbuf
@@ -161,14 +161,14 @@ hexchars:
 hexbuf:
   .ascii  "0000000000000000"
 
-  .align 3                      ; FIXME: Align to page size
+  .balign 8                      ; FIXME: Align to page size
 return_stack:
   .space RETURN_STACK_SIZE      ; Allocate static memory for the return stack
 return_stack_top:
   .quad 0                       ; FIXME: remove
 
   // This is used as a temporary input buffer when reading from files or the terminal
-  .align 3
+  .balign 8
 buffer:
   .space BUFFER_SIZE
 
@@ -244,7 +244,7 @@ _KEY:
   B       1b
 
   .data
-  .align 3
+  .balign 8
 currkey:
   .quad   buffer                ; Current place in input buffer (next character to read)
 bufftop:
@@ -383,22 +383,22 @@ _NUMBER:
 
   .text
 _EMIT:
-  PUSH  X1
-  PUSH  X2
+  PUSH    X1
+  PUSH    X2
   PUSH    LR
-  KLOAD X1, emit_buf  // string to print
-  STR W0, [X1]  // store character
-  MOV X0, #1    // 1 = stdout
-  MOV X2, #1    // length of our string
-  MOV     X16, #4   // MacOS write system call
-  SVC 0
+  KLOAD   X1, emit_buf          ; string to print
+  STR     W0, [X1]              ; store character
+  MOV     X0, #1                ; 1 = stdout
+  MOV     X2, #1                ; length of our string
+  MOV     X16, #4               ; MacOS write system call
+  SVC     0
   POP     LR
-  POP X2
-  POP X1
+  POP     X2
+  POP     X1
   RET
-  .data     // NB: easier to fit in the .data section
+  .data                         ; NB: easier to fit in the .data section
 emit_buf:
-  .space 1    // buffer used by EMIT
+  .space 1                      ; buffer used by EMIT
 
   .text
 _CR:
@@ -530,113 +530,100 @@ _COMMA:                         ; store X3 in current dictionary definition
 
     */
 
-_INTERPRET:
-//  PUSH    LR
-  ;; read next word
-  BL      _WORD             ; { X1: start address X2: length, X3 }
-  ;; is the word in the dictionary?
-  PUSH    X1
-  PUSH    X2
-  BL      _FIND             ; { X4: header (0 if not found) }
-  POP     X1
-  POP     X0
-  ;; set literal number flag to false (for now)
-  MOV     W6, #0
-debug1:
-  CMP     X4, #0
-  B.EQ    1f                ; not found (number or syntax error)
-  ;; word is in the dictionary - is it an IMMEDIATE keyword?
-  MOV     X0, X4            ; { W6: literal flag, X0 = X4: header != 0 }
-  BL      _TCFA             ; get codeword pointer into X0
-  MOV     X4, X0            ; { W6: literal flag, X0: codeword, X4: header}
-  LDRB    W5, [X4], #8      ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
-  AND     W5, W5, F_IMMED
-  CMP     W5, #0
-  B.NE    4f                ; if IMMEDIATE, jump straight to executing
-  B       2f
-  ;; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
-1:
-  ;; not in the dictionary (not a word) so assume it's a literal number
-  BL      _NUMBER           ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
-  MOV     W6, #1
-  CMP     X1, #0
-debug4: 
-  B.GT    6f
-  MOV     X5, X0            ; store number in X5
-  KLOAD   X0, _LIT          ; the codeword is LIT
-2:
-  ;; { X0: codeword, W6: literal flag, X5: number }
-  ;; are we compiling or executing?
-  KLOAD   X2, var_STATE
-  LDR     X2, [X2]
-  CMP     X2, #0
-debug2: 
-  B.EQ    4f                ; jump if executing
-  ;; { X0: codeword, W6: literal flag, X5: number }
-  ;; compiling - just append the word in X0 to the current dictionary definition
-  BL      _COMMA
-  CMP     W6, #0            ; was it a literal?
-  B.EQ    3f
-  MOV     X0, X5
-  BL      _COMMA
-3:
-//  POP     LR
-  NEXT
-4:
-  ;; { W6: literal flag }
-  ;; executing - run it!
-  CMP     W6, #0
-  B.NE    5f
-  ;; not a literal, execute it now
-  ;; this never returns but the codeword will eventually 
-  ;; call NEXT which will re-enter the loop in QUIT
-debug3: 
-  /*
-  KLOAD   X1, var_LATEST
-  LDR     X1, [X1]
-  BL      _PRINTWORD
-  POP     LR
-  */
-  LDR     X1, [X0]              ; X0 = DOCOL
-  BLR     X1
-5:
-  ;; executing a literal <=> push it on the stack
-  ;; { X5: number }
-//  POP     LR  
-  PUSH    X5
-  NEXT
-6:
-  ;; parse error (not a known word or a number in the current BASE)
-  ;; print error message followed by up to 40 characters of context
-  KPRINT  "PARSE ERROR: "
-  KLOAD   X2, currkey
-  LDR     X2, [X2]              ; get value of currkey
-  KLOAD   X1, buffer
-  SUB     X2, X2, X1            ; X2 = currkey - buffer (chars processed)
-  CMP     X2, #40               ; cap at 40 chars
-  B.LE    7f
-  MOV     X2, #40
-7:
-  SUB     X2, X2, #1
-  MOV     X0, #2                ; stderr
-  MOV     X16, #4               ; write
-  SVC     0
-8:
-  KPRINT  "■"                   ; insert your favorite delimiter here
-  KLOAD   X2, bufftop
-  LDR     X2, [X2]
-  KLOAD   X1, currkey
-  LDR     X1, [X1]
-  SUB     X2, X2, X1            ; X2 = bufftop - curkey
-  CMP     X2, #40
-  B.LE    9f
-  MOV     X2, #40
-9:
-  MOV     X0, #2                ; stderr
-  MOV     X16, #4
-  SVC     0
-  KPRINT  "\n"
-  NEXT
+	_INTERPRET:
+	  ;; read next word
+	  BL _WORD                      ; { X1: start address X2: length, X3 }
+	  ;; is the word in the dictionary?
+	  PUSH X1
+	  PUSH X2
+	  BL _FIND                      ; { X4: header (0 if not found) }
+	  POP X1
+	  POP X0
+	  ;; set literal number flag to false (for now)
+	  MOV W6, #0
+	  CMP X4, #0
+	  B.EQ 1f                     ; not found (number or syntax error)
+	  ;; word is in the dictionary - is it an IMMEDIATE keyword?
+	  MOV X0, X4                  ; { W6: literal flag, X0 = X4: header != 0 }
+	  BL _TCFA                    ; get codeword pointer into X0
+	  MOV X5, #0                  ; fixme: remove?
+	  LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+	  AND W5, W5, F_IMMED
+	  CMP W5, #0
+	  B.NE 4f                     ; if IMMEDIATE, jump straight to executing
+	  B 2f
+	  ;; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+	1:
+	  ;; not in the dictionary (not a word) so assume it's a literal number
+	  BL _NUMBER                  ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
+	  MOV W6, #1
+	  CMP X1, #0
+	  B.GT 6f
+	  MOV X5, X0                  ; store number in X5
+	  KLOAD X0, _LIT              ; the codeword is LIT
+	2:
+	  ;; { X0: codeword, W6: literal flag, X5: number }
+	  ;; are we compiling or executing?
+	  KLOAD X2, var_STATE
+	  LDR X2, [X2]
+	  CMP X2, #0
+	  B.EQ 4f                    ; jump if executing
+	  ;; { X0: codeword, W6: literal flag, X5: number }
+	  ;; compiling - just append the word in X0 to the current dictionary definition
+	  BL _COMMA
+	  CMP W6, #0                  ; was it a literal?
+	  B.EQ 3f
+	  MOV X0, X5
+	  BL _COMMA
+	3:
+	  NEXT
+	4:
+	  ;; { W6: literal flag }
+	  ;; executing - run it!
+	  CMP W6, #0
+	  B.NE 5f
+	  ;; not a literal, execute it now
+	  ;; this never returns but the codeword will eventually
+	  ;; call NEXT which will re-enter the loop in QUIT
+	  LDR X1, [X0] ; X0 = DOCOL
+	  BLR X1
+	5:
+	  ;; executing a literal <=> push it on the stack
+	  ;; { X5: number }
+	  PUSH X5
+	  NEXT
+	6:
+	  ;; parse error (not a known word or a number in the current BASE)
+	  ;; print error message followed by up to 40 characters of context
+	  KPRINT "PARSE ERROR: "
+	  KLOAD X2, currkey
+	  LDR X2, [X2]                ; get value of currkey
+	  KLOAD X1, buffer
+	  SUB X2, X2, X1              ; X2 = currkey - buffer (chars processed)
+	  CMP X2, #40                 ; cap at 40 chars
+	  B.LE 7f
+	  MOV X2, #40
+	7:
+	  SUB X2, X2, #1
+	  MOV X0, #2 ; stderr
+	  MOV X16, #4 ; write
+	  SVC 0
+	8:
+	  KPRINT "■"                  ; insert your favorite delimiter here
+	  KLOAD X2, bufftop
+	  LDR X2, [X2]
+	  KLOAD X1, currkey
+	  LDR X1, [X1]
+	  SUB X2, X2, X1              ; X2 = bufftop - curkey
+	  CMP X2, #40
+	  B.LE 9f
+	  MOV X2, #40
+	9:
+	  MOV X0, #2 ; stderr
+	  MOV X16, #4
+	  SVC 0
+	  KPRINT "\n"
+	  NEXT
 
 _set_up_data_segment:
   KLOAD   X0, var_HERE
@@ -669,7 +656,7 @@ _RANDOMIZE:
 urandom:
   .asciz "/dev/urandom"
 
-  .align 3
+  .balign 8
   ;;                  ^
   ;; +------------+   |
   ;; | PREVIOUS --+---'
@@ -782,7 +769,7 @@ _PRINTWORD2:
   //==================================================
 
   .data
-  .align  2
+  .balign  8
 MTEST2:
   .quad   _LIT
   .quad 4
