@@ -68,6 +68,12 @@
   ;; adrp	x19, _buffer@GOTPAGE
   ;; ldr	x19, [x19, _buffer@GOTPAGEOFF]
 
+  ;; Footnote on .align
+  ;; .align n   means different things in different assemblers
+  ;; In this assembler, it means "advance location until n least significant bits are 0".
+  ;; In other assemblers it means "advance location until address % n == 0"
+
+
 	#include "kload.s"
 	#include "kprint.s"
 	#include "pushpop.s"
@@ -79,12 +85,12 @@
 	BLR   	X1
   .endm
 
-	.global _main          		// Provide program starting address to linker
-	.align 4			// MacOS
+	.global _main          		    ; Provide program starting address to linker
+	.align 3			                ; MacOS (and see footnote on align further up)
 _main:
 	BL	_set_up_data_segment
 	KLOAD	X9, return_stack_top
-	KLOAD	X8, MTEST12
+	KLOAD	X8, MTEST19
 	NEXT				// won't return
 
 DOCOL:
@@ -102,7 +108,7 @@ DOCOL:
         .set    link, 0
 
 	.text
-	.align 4
+	.align 3
 printhex:
 	// printhex -- print reg X0 as 16 char hex string 000000000000002A
 	// X1: pointer to output buffer hexbuf
@@ -155,13 +161,14 @@ hexchars:
 hexbuf:
 	.ascii  "0000000000000000"
 
-	.align 4			// FIXME: Align to page size (4096 doesn't work)
+	.align 3			                ; FIXME: Align to page size
 return_stack:
-	.space RETURN_STACK_SIZE	// Allocate static memory for the return stack
+	.space RETURN_STACK_SIZE	    ; Allocate static memory for the return stack
 return_stack_top:
+	.quad 0                       ; FIXME: remove
 
 	// This is used as a temporary input buffer when reading from files or the terminal
-	.align 4
+	.align 3
 buffer:
 	.space BUFFER_SIZE
 
@@ -221,7 +228,6 @@ _KEY:
 	STR	    X2, [X1]
 	RET
 2:                              ; Out of input; use read(2) to fetch more input from stdin
-
 	MOV	    W0, 0		              ; stdin
 	KLOAD	  X1, buffer
 	KLOAD	  X2, currkey
@@ -238,7 +244,7 @@ _KEY:
 	B	      1b
 
 	.data
-	.align 4
+	.align 3
 currkey:
 	.quad 	buffer		            ; Current place in input buffer (next character to read)
 bufftop:
@@ -255,15 +261,18 @@ bufftop:
 	    char *p = word_buffer;
 	l1:
 	    c = key();
-	    if (c == '\\') goto l3;
+	    if (c == '\\') goto l4;
+	    if (c == '\n') goto l1;
 	    if (c == ' ') goto l1;
 	l2:
 	    *p++ = c;
 	    c = key();
-	    if (c != ' ') goto l2;
+	    if (c == ' ') goto l3;
+	    if (c == '\n') goto l3;
+      goto l2;
 	    *len = p - word_buffer;
 	    return word_buffer;
-	l3:
+  l4: 
 	    if (key() != '\n') goto l3;
 	    goto l1;
 	}
@@ -274,8 +283,16 @@ _WORD:                          ; returns with X1 = start address, X2 = length
 	PUSH	LR
 1:
 	BL	  _KEY                    ; read next char into X0
+//	PUSH  X0
+//	KPRINT "KEY: "
+//  BL    printhex
+//  BL    _CR
+//  POP   X0
+
 	CMP 	X0, '\\'                ; comment?
-	B.EQ	3f
+	B.EQ	4f
+	CMP   X0, '\n'
+  B.EQ  1b
 	CMP	  X0, ' '
 	B.EQ	1b                      ; keep looking for non-space
 	KLOAD	X2, word_buffer
@@ -285,12 +302,16 @@ _WORD:                          ; returns with X1 = start address, X2 = length
 	BL	  _KEY
 	POP	  X2
 	CMP	  X0, ' '
-	B.NE	2b
+  B.EQ  3f
+  CMP   X0, '\n'
+  B.EQ  3f
+	B     2b
+3:
 	KLOAD	X1, word_buffer
 	SUB	  X2, X2, X1              ; X2 = length
 	POP	  LR
 	RET
-3:				                      ; consume comment until EOL
+4:				                      ; consume comment until EOL
 	BL	  _KEY
 	CMP	  X0, '\n'
 	B.NE	3b
@@ -305,56 +326,59 @@ word_buffer:
 	// ( addr length -- n e ) convert string -> number
 	// n: parsed number, e: number of unparsed characters
 	// fixme: "1a" is not same as "1A" - perhaps leaves unparsed characters?
-
+  ;; return parsed number in X0; X1 > 0 if error (unparsed characters)
 	.text
 _NUMBER:
-	PUSH	LR
-	MOV	X2, X0			// string address
-	MOV	X0, #0			// result after conversion
-	CMP	X1, #0
-	B.LE	5f			// error if length <= 0
+  ;; X0 -- string address
+	;; X1 -- length
+  ;; X2 -- returned number
 
-	KLOAD	X3, var_BASE
-	LDR	X3, [X3]		// X3 = BASE
-//	MOV	X3, #10
+	PUSH	  LR
+	MOV	    X2, X0			// string address
+	MOV	    X0, #0			// result after conversion
+	CMP	    X1, #0
+	B.LE	  5f			// error if length <= 0
 
-	LDRB	W4, [X2], #1		// load first char
-	MOV	X5, #0
-	CMP	X4, '-'
-	B.NE	2f			// number is positive
-	MOV	X5, #1
-	SUB	X1, X1, #1
-	CMP	X1, #0			// do we have more than just "-" ?
-	B.GT	1f			// yes, proceed with conversion
-	MOV	X1, #1			// error
-	B	5f
+	KLOAD	  X3, var_BASE
+	LDR	    X3, [X3]		// X3 = BASE
+
+	LDRB	  W4, [X2], #1		// load first char
+	MOV	    X5, #0
+	CMP	    X4, '-'
+	B.NE	  2f			// number is positive
+	MOV	    X5, #1
+	SUB	    X1, X1, #1
+	CMP	    X1, #0			// do we have more than just "-" ?
+	B.GT	  1f			// yes, proceed with conversion
+	MOV	    X1, #1			// error
+	B	      5f
 1:
-	MUL 	X6, X0, X3		//
-	MOV	X0, X6			// number *= BASE
-	LDRB	W4, [X2], #1
+	MUL 	  X6, X0, X3		//
+	MOV	    X0, X6			// number *= BASE
+	LDRB	  W4, [X2], #1
 2:
-	SUB 	X4, X4, '0'
-	CMP	X4, #0
-	B.LT	4f			// < 0, end
-	CMP	X4, #9
-	B.LE	3f			// digit
-	SUB	X4, X4, #17		// 17 = 'A' - '0'
-	CMP 	X4, #0
-	B.LT	4f
-	ADD	X4, X4, #10
+	SUB 	  X4, X4, '0'
+	CMP	    X4, #0
+	B.LT	  4f			// < 0, end
+	CMP	    X4, #9
+	B.LE	  3f			// digit
+	SUB	    X4, X4, #17		// 17 = 'A' - '0'
+	CMP 	  X4, #0
+	B.LT	  4f
+	ADD	    X4, X4, #10
 3:
-	CMP	X4, X3			// compare to current BASE
-	B.GE	4f			// end, > BASE
-	ADD	X0, X0, X4		// add digit to result
-	SUB	X1, X1, #1
-	CMP	X1, #0
-	B.GT 	1b			// continue processing while there are characters
+	CMP	    X4, X3			// compare to current BASE
+	B.GE	  4f			// end, > BASE
+	ADD	    X0, X0, X4		// add digit to result
+	SUB	    X1, X1, #1
+	CMP	    X1, #0
+	B.GT 	  1b			// continue processing while there are characters
 4:
-	CMP	X5, #1			// number is negative if X5==1
-	B.NE	5f
-	NEG	X0, X0
+	CMP	    X5, #1			// number is negative if X5==1
+	B.NE	  5f
+	NEG	    X0, X0
 5:
-	POP	LR
+	POP	    LR
 	RET
 
 	.text
@@ -428,16 +452,15 @@ _FIND:
 3:
   RET                                ; return with X4 -> dictionary header
 
-  ;; return the code field address in X1
   ;; X0 - address of dictionary header
+  ;; return the code field address in X0
 _TCFA:
-  MOV	    X2, #0
-	LDRB	  W2, [X0, #8]!         ; skip link pointer and load length + flags
-	AND	    W2, W2, F_LENMASK     ; strip the flags
-	ADD	    X1, X0, X2	          ; skip characters
-  ADD	    X1, X1, #8	          ; skip length byte (1) and add 7
-	AND	    X1, X1, ~7	          ; ... to make it 8-byte aligned
-	LDR	    X0, [X1]
+  MOV	    X1, #0
+	LDRB	  W1, [X0, #8]!         ; skip link pointer and load length + flags
+	AND	    W1, W1, F_LENMASK     ; strip the flags
+	ADD	    X0, X0, X1	          ; skip characters
+  ADD	    X0, X0, #8	          ; skip length & flags (1) and add 7
+	AND	    X0, X0, #~7	          ; ... to make it 8-byte aligned
 	RET
 
 	// X1: length
@@ -465,34 +488,155 @@ _CREATE:
 	RET
 
 	// X0 = code pointer to store
-_COMMA:
+_COMMA:                         ; store X3 in current dictionary definition
 	KLOAD	  X2, var_HERE
 	LDR	    X1, [X2]	            ; X1 = HERE
-	STR	    X0, [X1], #8	        ; *X1++ = X0
+	STR	    X0, [X1], #8	        ; *X1++ = X3
 	STR	    X1, [X2]	            ; HERE = X1
 	RET
 
+  /* INTERPRET is the REPL toploop
+
+	interpret_is_lit = 0;
+  X1, X2 = word();
+  X4 = find(X1, X2);        // returns dictionary header
+  if (X4 == 0) goto 1;      // number or word not in the dictionary
+  if immediate(X4) goto 4;  // if immediate, execute!
+  goto 2;
+
+1: // not in the dictionary so assume it's a literal number
+  interpret_is_lit = 1;
+  X4, X5 = number();
+  if (X5 > 0) goto 6;     // not a number, so syntax error
+  X0 = _LIT
+2:
+  if (STATE == 0) goto 4; // we are executing
+  comma(X0);              // write _LIT
+  if (interpret_is_lit == 0) goto 3;
+  comma(X5);              // write number
+3:
+  next();
+
+4: // executing (run it)
+  if (interpret_is_lit != 0) goto 5;
+  goto *X0;                // execute word
+5: // execute literal, i.e., push it on the stack
+  push(x5);
+  next();
+
+6:
+  print("PARSE ERROR: ");
+  next();
+
+    */
+
 _INTERPRET:
-	PUSH    LR
-  MOV     X1, #0
-  KLOAD   X3, interpret_is_lit
-  STR     X1, [X3]              ; interpret_is_lit = 0
-  BL      _WORD                 ; returns with X0 = length, X1 = start address
-  BL      _FIND                 ; returns with X0 = pointer to header, or 0 if not found
-  MOV     X1, X4
+//  PUSH    LR
+  ;; read next word
+  BL      _WORD             ; { X1: start address X2: length, X3 }
+	;; is the word in the dictionary?
+  PUSH    X1
+  PUSH    X2
+  BL      _FIND             ; { X4: header (0 if not found) }
+	POP     X1
+  POP     X0
+  ;; set literal number flag to false (for now)
+  MOV     W6, #0
+debug1:
+	CMP     X4, #0
+  B.EQ    1f                ; not found (number or syntax error)
+  ;; word is in the dictionary - is it an IMMEDIATE keyword?
+	MOV     X0, X4            ; { W6: literal flag, X0 = X4: header != 0 }
+  BL      _TCFA             ; get codeword pointer into X0
+	MOV     X4, X0            ; { W6: literal flag, X0: codeword, X4: header}
+  LDRB    W5, [X4], #8      ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+  AND     W5, W5, F_IMMED
+  CMP     W5, #0
+  B.NE    4f                ; if IMMEDIATE, jump straight to executing
+  B       2f
+	;; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+1:
+  ;; not in the dictionary (not a word) so assume it's a literal number
+  BL      _NUMBER           ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
+	MOV     W6, #1
+  CMP     X1, #0
+debug4: 
+  B.GT    6f
+  MOV     X5, X0            ; store number in X5
+	KLOAD   X0, _LIT          ; the codeword is LIT
+2:
+  ;; { X0: codeword, W6: literal flag, X5: number }
+  ;; are we compiling or executing?
+  KLOAD   X2, var_STATE
+  LDR     X2, [X2]
+  CMP     X2, #0
+debug2: 
+  B.EQ    4f                ; jump if executing
+	;; { X0: codeword, W6: literal flag, X5: number }
+  ;; compiling - just append the word in X0 to the current dictionary definition
+  BL      _COMMA
+  CMP     W6, #0            ; was it a literal?
+  B.EQ    3f
+  MOV     X0, X5
+  BL      _COMMA
+3:
+//	POP     LR
+  NEXT
+4:
+	;; { W6: literal flag }
+  ;; executing - run it!
+  CMP     W6, #0
+  B.NE    5f
+  ;; not a literal, execute it now
+  ;; this never returns but the codeword will eventually 
+  ;; call NEXT which will re-enter the loop in QUIT
+debug3: 
+	/*
+  KLOAD   X1, var_LATEST
+  LDR     X1, [X1]
   BL      _PRINTWORD
-
-  POP     LR
-	RET
-
-	.data
-  .align  4
-interpret_is_lit:               ; flag used to record if reading a literal
-  .quad   0
-
-
-	.text
-  .align  4
+	POP     LR
+  */
+  LDR     X1, [X0]              ; X0 = DOCOL
+  BLR     X1
+5:
+  ;; executing a literal <=> push it on the stack
+  ;; { X5: number }
+//	POP     LR	
+  PUSH    X5
+  NEXT
+6:
+  ;; parse error (not a known word or a number in the current BASE)
+  ;; print error message followed by up to 40 characters of context
+  KPRINT  "PARSE ERROR: "
+	KLOAD   X2, currkey
+  LDR     X2, [X2]              ; get value of currkey
+  KLOAD   X1, buffer
+  SUB     X2, X2, X1            ; X2 = currkey - buffer (chars processed)
+  CMP     X2, #40               ; cap at 40 chars
+  B.LE    7f
+  MOV     X2, #40
+7:
+  SUB     X2, X2, #1
+  MOV     X0, #2                ; stderr
+  MOV     X16, #4               ; write
+  SVC     0
+8:
+  KPRINT  "■"                   ; insert your favorite delimiter here
+  KLOAD   X2, bufftop
+  LDR     X2, [X2]
+  KLOAD   X1, currkey
+  LDR     X1, [X1]
+  SUB     X2, X2, X1            ; X2 = bufftop - curkey
+  CMP     X2, #40
+  B.LE    9f
+  MOV     X2, #40
+9:
+  MOV     X0, #2                ; stderr
+	MOV     X16, #4
+  SVC     0
+	KPRINT  "\n"
+  NEXT
 
 _set_up_data_segment:
 	KLOAD 	X0, var_HERE
@@ -504,85 +648,141 @@ _set_up_data_segment:
 	;; Here, we read a 64-bit word from /dev/urandom
 	;; and put it in var_RNDSEED
 _RANDOMIZE:
-	MOV	X0, #-2		              ; AT_FDCWD
+	MOV	    X0, #-2               ; AT_FDCWD
 	KLOAD 	X1, urandom
-	MOV	    X2, #0		          ; O_RDONLY
-	MOV	    X3, #0666	          ; S_RDWR
+	MOV	    X2, #0		            ; O_RDONLY
+	MOV	    X3, #0666	            ; S_RDWR
 	MOV	    X16, #SYS_openat
 	SVC	    0
 	ADDS	  X11, XZR, X0
 	B.PL	  3f
 	KPRINT  "Error: could not open /dev/urandom\n"
-	B	_HALT
+	B	      _HALT
 3:
-	MOV	X0, X11
-	KLOAD	X1, var_RNDSEED
-	MOV	X2, #4
-	MOV	X16, #SYS_read
-	SVC	0
+	MOV	    X0, X11
+	KLOAD	  X1, var_RNDSEED
+	MOV	    X2, #4
+	MOV	    X16, #SYS_read
+	SVC   	0
 	RET
 
 urandom:
 	.asciz "/dev/urandom"
 
-	.align 4
+	.align 3
+  ;;                  ^
+	;; +------------+   |
+  ;; | PREVIOUS --+---'
+	;; +------------+
+  ;; |LENGTH+FLAGS|
+	;; +------------+
+  ;; |'F' 'O' 'O' |
+	;; +------------+
+  ;; | CODEWORD --+--,
+	;; +------------+  |
+  ;; |            |<-'
+  ;; |    BODY    |
+  ;; |            |
+	;; +------------+
+  ;;
 
-_PRINTWORD:
+_CODEWORDS:                     ; print first few codewords at X0
+	PUSH    LR
+	KPRINT  "codeword: "
+	MOV     X5, X0
+  LDR     X0, [X5], #8
+  BL      printhex
+  BL      _CR
+	KPRINT  "        : "
+  LDR     X0, [X5], #8
+  BL      printhex
+  BL      _CR
+	KPRINT  "        : "
+  LDR     X0, [X5], #8
+  BL      printhex
+  BL      _CR
+	
+  POP     LR
+  RET
+
+
+
+
+_PRINTWORD: 
+	PUSH      X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
+  BL        _PRINTWORD2
+  POP       LR %% POP X3 %% POP X2 %% POP X1 %% POP X0
+  RET
+
+
+_PRINTWORD2:
 	// X1 -> beginning of dictionary entry
 	CMP X1, #0
 	BNE 1f
 	RET
 1:
-	PUSH X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
-	KPRINT "start:    "
-	MOV X0, X1
-	BL printhex
-	BL _CR
-	KPRINT "previous: "
-	LDR X0, [X1], #8
-	BL printhex
-	BL _CR
+	PUSH      LR
+	KPRINT    "start:    "
+	MOV       X0, X1
+	BL        printhex
+	BL        _CR
+	KPRINT    "previous: "
+	LDR       X0, [X1], #8
+  PUSH      X0              ; save ptr to previous word in X5
+	BL        printhex
+	BL        _CR
 
-	KPRINT "length:   "
-	MOV X0, #0
-	LDRB W0, [X1]
-	AND W0, W0, F_LENMASK	// length
-	MOV X2, X0	// len
-	BL printhex
+	KPRINT    "length:   "
+	MOV       X0, #0
+	LDRB      W0, [X1]
+	AND       W0, W0, F_LENMASK	// length
+	MOV       X2, X0	// len
+	BL        printhex
 
-	KPRINT ", immediate="
-	LDRB   W0, [X1]
-	AND    W0, W0, F_IMMED	// immediate mask
-	ASR    W0, W0, #7
-	ADD    W0, W0, '0'
-	BL     _EMIT
+	KPRINT    ", immediate="
+	LDRB      W0, [X1]
+	AND       W0, W0, F_IMMED	// immediate mask
+	ASR       W0, W0, #7
+	ADD       W0, W0, '0'
+	BL        _EMIT
 
-	KPRINT ", hidden="
-	LDRB   W0, [X1], #1
-	AND    W0, W0, F_HIDDEN	// hidden mask
-	ASR    W0, W0, #5
-	ADD    W0, W0, '0'
-	BL     _EMIT
-	BL     _CR
+	KPRINT    ", hidden="
+	LDRB      W0, [X1], #1
+	AND       W0, W0, F_HIDDEN	// hidden mask
+	ASR       W0, W0, #5
+	ADD       W0, W0, '0'
+	BL        _EMIT
+	BL        _CR
 
-	KPRINT "name:     "
-	MOV X3, X1
-	MOV X0, #1	// stdout
-	MOV X1, X3	// str
-	MOV X16, #4
-	SVC 0
+	PUSH      X1
+	KPRINT    "name:     "
+	MOV       X3, X1
+	MOV       X0, #1	// stdout
+	MOV       X1, X3	// str
+	MOV       X16, #4
+	SVC       0
+	POP       X1
+	BL        _CR
 
-	BL _CR
-	BL _CR
-	POP LR %% POP X3 %% POP X2 %% POP X1 %% POP X0
-	RET
+  ADD       X1, X1, X2
+  ADD       X1, X1, #7
+  AND       X1, X1, #~7
+	LDR       X0, [X1]
+  BL        _CODEWORDS
+
+	BL        _CR
+	BL        _CR
+  POP       X1
+  POP       LR
+  B         _PRINTWORD2                  ; continue with previous word
+
 
 	//==================================================
 	// Test suites
 	//==================================================
 
 	.data
-	.align	4
+	.align	2
 MTEST2:
 	.quad 	_LIT
 	.quad	4
@@ -796,7 +996,9 @@ MTEST21:                        ; print all integers from 9 .. 0
   .quad -9*8                    ; ----+-------'
   .quad HALT                    ; <---'
 
-
+MTEST22:
+  .quad DEBUG
+  .quad HALT
 
 
 	// The BSS segment won't add to the binary's size

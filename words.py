@@ -4,13 +4,16 @@ prev = "0"
 
 def header(name, label, flags):
     print("\t.data")
-    print("\t.align 4")
+    print("\t.align 3")
     print("\t.globl name_" + label)
     print("name_" + label + ":")
     print("\t.quad " + prev)
-    print("\t.byte " + str(len(name)))
+    if flags:
+        print("\t.byte " + str(len(name)) + " + " + str(flags))
+    else:
+        print("\t.byte " + str(len(name)))
     print("\t.ascii \"" + name + "\"")
-    print("\t.align 4")
+    print("\t.align 3")         # should be 8? fixit
     print("\t.globl " + label)
     print(label + ":")
 
@@ -23,9 +26,9 @@ def mkcode(name, label, cmds, flags=0):
     print("code_" + label + ":")
     for c in cmds:
     	print("\t" + c)
-    print	   
-    return "name_" + label    
-    
+    print
+    return "name_" + label
+
 def mkword(name, label, cmds, flags=0):
     global prev
     header(name, label, flags)
@@ -42,14 +45,14 @@ def mkconstint(name, label, value, flags=0):
     return mkcode(name, label, ["MOV X0, #" + value, "PUSH X0", "NEXT"], flags)
 def mkconstaddr(name, label, value, flags=0):
     return mkcode(name, label, ["KLOAD X0, " + value, "PUSH X0", "NEXT"], flags)
-    
+
 def mkvar(name, label, initial=0, flags=0):
     return mkcode(name, label, [
     		 "KLOAD X0, var_" + name,
 		 "PUSH X0",
 		 "NEXT",
 		 ".data",
-		 ".align 4",
+		 ".align 3",
 		 "var_" + name + ":",
 		 ".quad " + str(initial)
 		 ], flags)
@@ -72,7 +75,7 @@ prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 
 # ANS FORTH says that the comparison words should return -1 for TRUE and 0 for FALSE
 # Jones Forth uses the C programming convention 1 for TRUE and 0 for FALSE.
-# Here, I'm using the ANS FORTH convention but if you prefer Jones Forth way of doing it, 
+# Here, I'm using the ANS FORTH convention but if you prefer Jones Forth way of doing it,
 # replace CSETM with CSET below.
 
 # ( a b -- a ) top two words are equal?
@@ -86,6 +89,7 @@ prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X0, X1", "CSETM X0, NE", "P
 prev = mkcode("KEY", "KEY", ["BL _KEY", "PUSH X0", "NEXT"])
 
 # WORD ( -- addr n ) where n is length of string starting at addr
+# read next word from stdin (up until whitespace)
 prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X2", "NEXT"])
 
 # NUMBER ( addr length -- n e ) convert string -> number: n is parsed number, e is nr of unparsed chars
@@ -112,13 +116,10 @@ prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary ent
     "PUSH X4",
     "NEXT"])
 
-prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X1", "NEXT"])
+prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X0", "NEXT"])
 
 prev = mkcode("PRINTWORD", "PRINTWORD", [    # ( addr -- ) prints info on dictionary entry
-    "POP  X1",
-    "BL   _PRINTWORD",
-    "PUSH X1",
-    "NEXT"])
+    "POP  X1", "BL   _PRINTWORD", "NEXT"])
 
 prev = mkcode("CREATE", "CREATE", [    # ( addr length -- ) creates header for word
     "POP X1",		# length
@@ -141,7 +142,7 @@ prev = mkcode("[", "_LBRAC", [    # ( -- ) sets STATE=0 (immediate mode)
 prev = mkcode("]", "_RBRAC", [    # ( -- ) sets STATE=1 (compile mode)
     "KLOAD X0, var_STATE",
     "MOV   X1, #1",
-    "STR X1, [X0]",
+    "STR   X1, [X0]",
     "NEXT"])
 
 prev = mkcode("HIDDEN", "HIDDEN", [  	  # ( addr -- ) toggle HIDDEN bit in dictionary entry
@@ -153,7 +154,7 @@ prev = mkcode("HIDDEN", "HIDDEN", [  	  # ( addr -- ) toggle HIDDEN bit in dicti
     "NEXT"])
 
 # ( -- ) toggle IMMED bit for latest dictionary entry
-prev = mkcode("IMMEDIATE", "IMMEDIATE", [ 
+prev = mkcode("IMMEDIATE", "IMMEDIATE", [
     "KLOAD X0, var_LATEST",
     "LDR   X0, [X0]",		              # X0 = LATEST
     "ADD   X0, X0, #8",
@@ -165,6 +166,7 @@ prev = mkcode("IMMEDIATE", "IMMEDIATE", [
 # ( -- addr ) get codeword pointer of next word
 # Common usage is ' FOO , which buries the address of FOO into the current word
 # Note: this only works in compiled mode
+# fixme: detect (and bail out) if not in compiled mode
 prev = mkcode("'", "TICK", [
     "LDR  X0, [X8], #8",        # X0 = *(IP+8)
     "PUSH X0",
@@ -220,6 +222,7 @@ prev = mkcode("LITSTRING", "_LITSTRING", [
     "NEXT" ])
 
 # TELL prints a string
+# X1: addr of string, X2: length of string
 prev = mkcode("TELL", "TELL", [
     "MOV X0, #1",               # stdout
     "POP X2",                   # length of string
@@ -230,6 +233,19 @@ prev = mkcode("TELL", "TELL", [
 
 # INTERPRET is the top loop of the FORTH system
 prev = mkcode("INTERPRET", "INTERPRET", [ "BL _INTERPRET", "NEXT" ])
+
+prev = mkword("DEBUG", "DEBUG", [  # DEBUG <enter> PLUS <enter>
+    "WORD",
+    "FIND",
+    "PRINTWORD",
+])
+
+prev = mkword("DEBUGLATEST", "DEBUGLATEST", [  # DEBUGLATEST 
+    "_LATEST",
+    "FETCH",
+    "PRINTWORD",
+])
+
 
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
@@ -242,10 +258,12 @@ prev = mkword(":", "COLON", [ 	    # start word definition
     "_LATEST", "FETCH", "HIDDEN",   # make the word hidden
     "_RBRAC", "EXIT" ])             # go into compile mode
 
-prev = mkword(";", "SEMICOLON", [	# finish word definition 
+prev = mkword(";", "SEMICOLON", [	# finish word definition
     "_LIT", "EXIT", "COMMA",		# append EXIT (so the word will return)
     "_LATEST", "FETCH", "HIDDEN",	# toggle hidden flag -- unhide the word
-    "_LBRAC", "EXIT" ], "F_IMMED")	# go back to IMMEDIATE mode
+    "_LBRAC",
+    "EXIT",
+], "F_IMMED")	# go back to IMMEDIATE mode
 
 # set hidden flag in current word
 prev = mkword("HIDE", "HIDE", [ "WORD", "FIND", "HIDDEN", "EXIT" ])
@@ -254,8 +272,14 @@ prev = mkword("HIDE", "HIDE", [ "WORD", "FIND", "HIDDEN", "EXIT" ])
 prev = mkword("QUIT", "QUIT", [
     "RZ", "RSPSTORE",           # R0 RSP! - clear the return stack
     "INTERPRET",                # interpret the next word
+#    "_LATEST",
+#    "FETCH",
+#    "PRINTWORD",
     "BRANCH", "-16"             # ... and loop (indefinitely)
     ])
+
+
+
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
@@ -266,4 +290,5 @@ prev = mkvar("S0", "SZ")
 prev = mkvar("BASE", "BASE", 10)
 prev = mkvar("RNDSEED", "RNDSEED", "0xACE1")  # can be initialized to any non-zero seed
 # substitute in the last entry for name_BASE below:
-prev = mkvar("LATEST", "_LATEST", "name_BASE")
+prev = mkvar("LATEST", "_LATEST", "name_RNDSEED")
+# interpreter probably can't find LATEST in dictionary
