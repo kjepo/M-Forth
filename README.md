@@ -4,6 +4,9 @@
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 <p>
 <b>Note:</b> This is work in progress and not yet ready for release.
+<b>Update:</b> As of 2021-12-06 M-Forth is now capable of running
+all the code in <pre>stdlib.f</pre>. Not all primitives are ready though,
+and documentation is still incomplete.
 </p>
 
 ## Introduction and background
