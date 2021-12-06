@@ -58,14 +58,19 @@ def mkvar(name, label, initial=0, flags=0):
 		 ], flags)
 
 prev = mkcode("EXIT", "EXIT", ["POPRSP X8", "NEXT"])
-prev = mkcode("PLUS", "PLUS", ["POP X0", "POP X1", "ADD X0, X0, X1", "PUSH X0", "NEXT"])
-prev = mkcode("TIMES", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0", "NEXT"])
+prev = mkcode("+", "PLUS", ["POP X0", "POP X1", "ADD X0, X1, X0", "PUSH X0", "NEXT"])
+prev = mkcode("-", "MINUS", ["POP X0", "POP X1", "SUB X0, X1, X0", "PUSH X0", "NEXT"])
+prev = mkcode("*", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0", "NEXT"])
+prev = mkcode("1+", "INCR", ["POP X0", "ADD X0, X0, #1", "PUSH X0", "NEXT"])
+prev = mkcode("1-", "DECR", ["POP X0", "SUB X0, X0, #1", "PUSH X0", "NEXT"])
 prev = mkcode("DUP", "DUP", ["POP X0", "PUSH X0", "PUSH X0", "NEXT"])
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
+prev = mkcode("SWAP", "SWAP", ["POP X0", "POP X1", "PUSH X0", "PUSH X1", "NEXT"])
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
 prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
+
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
@@ -79,9 +84,17 @@ prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 # replace CSETM with CSET below.
 
 # ( a b -- a ) top two words are equal?
-prev = mkcode("=", "EQU", ["POP	X0", "POP X1", "CMP X0, X1", "CSETM X0, EQ", "PUSH X0", "NEXT"])
+prev = mkcode("=", "EQU", ["POP	X0", "POP X1", "CMP X1, X0", "CSETM X0, EQ", "PUSH X0", "NEXT"])
 # ( a b -- a ) top two words not equal?
-prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X0, X1", "CSETM X0, NE", "PUSH X0", "NEXT"])
+prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X1, X0", "CSETM X0, NE", "PUSH X0", "NEXT"])
+prev = mkcode("<", "_LT", [ "POP X0", "POP X1", "CMP X1, X0", "CSETM X0, LT", "PUSH X0", "NEXT"])
+prev = mkcode("0=", "ZEQU", [   # top of stack equals 0?
+    "POP X0",
+    "CMP X0, #0",
+    "CSETM X0, EQ",
+    "PUSH X0",
+    "NEXT"
+])
 
 # I/O
 
@@ -109,6 +122,12 @@ prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
     "LDR  X0, [X0]",
     "PUSH X0",
     "NEXT"])
+
+prev = mkcode("!", "STORE", [
+    "POP X0",                   # address to store at
+    "POP X1",                   # data to store there
+    "STR X1, [X0]",             # store it
+    "NEXT" ])
 
 prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string
     "POP  X2",                      # X1 = length
@@ -235,6 +254,23 @@ prev = mkcode("TELL", "TELL", [
 # INTERPRET is the top loop of the FORTH system
 prev = mkcode("INTERPRET", "INTERPRET", [ "BL _INTERPRET", "NEXT" ])
 
+# CHAR puts the ASCII code of the first character of the following word on the stack
+# For instance, CHAR A puts 65 on the stack
+prev = mkcode("CHAR", "CHAR", [
+    "BL   _WORD",
+    "MOV  X0, #0",
+    "LDRB W0, [X1]",
+    "PUSH X0",
+    "NEXT"
+])
+
+# run execution tokens (xt's)
+# after xt runs, its NEXT will continue executing the current word
+prev = mkcode("EXECUTE", "EXECUTE", [
+    "POP  X0",                  # X0 = execution token
+    "BLR  X1"                   # jump to it
+])
+
 prev = mkword("DEBUG", "DEBUG", [  # DEBUG <enter> PLUS <enter>
     "WORD",
     "FIND",
@@ -289,7 +325,6 @@ prev = mkvar("STATE", "STATE")
 prev = mkvar("HERE", "HERE")
 prev = mkvar("S0", "SZ")
 prev = mkvar("BASE", "BASE", 10)
-prev = mkvar("RNDSEED", "RNDSEED", "0xACE1")  # can be initialized to any non-zero seed
-# substitute in the last entry for name_BASE below:
+# substitute in the _last_ entry for name_RNDSEED below:
 prev = mkvar("LATEST", "_LATEST", "name_RNDSEED")
-# interpreter probably can't find LATEST in dictionary
+prev = mkvar("RNDSEED", "RNDSEED", "0xACE1")  # can be initialized to any non-zero seed

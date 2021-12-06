@@ -283,12 +283,6 @@ _WORD:                          ; returns with X1 = start address, X2 = length
   PUSH  LR
 1:
   BL    _KEY                    ; read next char into X0
-//  PUSH  X0
-//  KPRINT "KEY: "
-//  BL    printhex
-//  BL    _CR
-//  POP   X0
-
   CMP   X0, '\\'                ; comment?
   B.EQ  4f
   CMP   X0, '\n'
@@ -314,7 +308,7 @@ _WORD:                          ; returns with X1 = start address, X2 = length
 4:                              ; consume comment until EOL
   BL    _KEY
   CMP   X0, '\n'
-  B.NE  3b
+  B.NE  4b
   B     1b
 
   .data
@@ -549,6 +543,7 @@ _COMMA:                         ; store X3 in current dictionary definition
 	  MOV X5, #0                  ; fixme: remove?
 	  LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
 	  AND W5, W5, F_IMMED
+debug1: 
 	  CMP W5, #0
 	  B.NE 4f                     ; if IMMEDIATE, jump straight to executing
 	  B 2f
@@ -598,12 +593,14 @@ _COMMA:                         ; store X3 in current dictionary definition
 	  KPRINT "PARSE ERROR: "
 	  KLOAD X2, currkey
 	  LDR X2, [X2]                ; get value of currkey
-	  KLOAD X1, buffer
-	  SUB X2, X2, X1              ; X2 = currkey - buffer (chars processed)
+    MOV X1, X2
+	  KLOAD X0, buffer
+	  SUB X2, X2, X0              ; X2 = currkey - buffer (chars processed)
 	  CMP X2, #40                 ; cap at 40 chars
 	  B.LE 7f
 	  MOV X2, #40
 	7:
+    SUB X1, X1, X2
 	  SUB X2, X2, #1
 	  MOV X0, #2 ; stderr
 	  MOV X16, #4 ; write
