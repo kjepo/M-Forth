@@ -99,7 +99,8 @@ DOCOL:
   NEXT
 
   .set M_VERSION,1
-  .set RETURN_STACK_SIZE, 8192
+	;; the size of the return stack will increase the executable
+  .set RETURN_STACK_SIZE, 1048576 // 65536 // 8192
   .set BUFFER_SIZE,4096 // input buffer
   .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024     // 1 MB
   .set  F_IMMED,0x80    // three masks for the length field [*] below
@@ -285,10 +286,12 @@ _WORD:                          ; returns with X1 = start address, X2 = length
   BL    _KEY                    ; read next char into X0
   CMP   X0, '\\'                ; comment?
   B.EQ  4f
-  CMP   X0, '\n'
-  B.EQ  1b
   CMP   X0, ' '
   B.EQ  1b                      ; keep looking for non-space
+  CMP   X0, '\n'
+  B.EQ  1b
+  CMP   X0, '\t'
+  B.EQ  1b
   KLOAD X2, word_buffer
 2:
   STRB  W0, [X2], #1            ; *word_buffer++ = W0
@@ -298,6 +301,8 @@ _WORD:                          ; returns with X1 = start address, X2 = length
   CMP   X0, ' '
   B.EQ  3f
   CMP   X0, '\n'
+  B.EQ  3f
+  CMP   X0, '\t'
   B.EQ  3f
   B     2b
 3:

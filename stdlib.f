@@ -230,3 +230,16 @@
        THEN -1 + DUP . RECURSE
 ;
 
+: COUNTDOWN#2 ( print 10 random numbers between 0..9 )
+  10   
+  RANDOMIZE
+  BEGIN
+    DUP 0= IF
+        EXIT
+    THEN
+    1-
+    RND 10 MOD .
+  AGAIN
+;
+
+
