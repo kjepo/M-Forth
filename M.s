@@ -3,9 +3,9 @@
   ;;     M FORTH for the M1 processor on MacOS X
   ;;
   ;;     Copyright (C) K.Post kjell@irstafoto.se
-	;;
+  ;;
   ;;                     Abstract
-	;;
+  ;;
   ;;      M Forth is an implementation of Forth
   ;;      for the M1 ARM  processor on MacOS X.
   ;;      The idea is to bootstrap a reasonably
@@ -79,7 +79,7 @@
   #include "pushpop.s"
   #include <sys/syscall.h>
 
-	;; NEXT is the heart of the inner interpreter.
+  ;; NEXT is the heart of the inner interpreter.
   ;; It fetches and jumps to the next instruction.
 
   .macro  NEXT
@@ -93,7 +93,7 @@
 _main:
   MOV   X0, SP
   KLOAD X9, var_S0
-	STR   X0, [X9]                ; let S0 = initial SP
+  STR   X0, [X9]                ; let S0 = initial SP
   KLOAD X9, return_stack_top    ; X9 = initial RSP
   KLOAD X8, COLDSTART           ; calls QUIT which starts the REPL
   BL    _set_up_data_segment    ; initialize HERE = next available word in data segment
@@ -105,7 +105,7 @@ DOCOL:
   NEXT
 
   .set M_VERSION,1
-	;; the size of the return stack _will_ increase the executable
+  ;; the size of the return stack _will_ increase the executable
   .set RETURN_STACK_SIZE, 1048576 // 65536 // 8192
   .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024 ; 1 MB
   .set BUFFER_SIZE,4096         ; input buffer
@@ -535,103 +535,103 @@ _COMMA:                         ; store X3 in current dictionary definition
 
     */
 
-	_INTERPRET:
-	  ;; read next word
-	  BL _WORD                      ; { X1: start address X2: length, X3 }
-	  ;; is the word in the dictionary?
-	  PUSH X1
-	  PUSH X2
-	  BL _FIND                      ; { X4: header (0 if not found) }
-	  POP X1
-	  POP X0
-	  ;; set literal number flag to false (for now)
-	  MOV W6, #0
-	  CMP X4, #0
-	  B.EQ 1f                     ; not found (number or syntax error)
-	  ;; word is in the dictionary - is it an IMMEDIATE keyword?
-	  MOV X0, X4                  ; { W6: literal flag, X0 = X4: header != 0 }
-	  BL _TCFA                    ; get codeword pointer into X0
-	  MOV X5, #0                  ; fixme: remove?
-	  LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
-	  AND W5, W5, F_IMMED
+  _INTERPRET:
+    ;; read next word
+    BL _WORD                      ; { X1: start address X2: length, X3 }
+    ;; is the word in the dictionary?
+    PUSH X1
+    PUSH X2
+    BL _FIND                      ; { X4: header (0 if not found) }
+    POP X1
+    POP X0
+    ;; set literal number flag to false (for now)
+    MOV W6, #0
+    CMP X4, #0
+    B.EQ 1f                     ; not found (number or syntax error)
+    ;; word is in the dictionary - is it an IMMEDIATE keyword?
+    MOV X0, X4                  ; { W6: literal flag, X0 = X4: header != 0 }
+    BL _TCFA                    ; get codeword pointer into X0
+    MOV X5, #0                  ; fixme: remove?
+    LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+    AND W5, W5, F_IMMED
 debug1:
-	  CMP W5, #0
-	  B.NE 4f                     ; if IMMEDIATE, jump straight to executing
-	  B 2f
-	  ;; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
-	1:
-	  ;; not in the dictionary (not a word) so assume it's a literal number
-	  BL _NUMBER                  ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
-	  MOV W6, #1
-	  CMP X1, #0
-	  B.GT 6f
-	  MOV X5, X0                  ; store number in X5
-	  KLOAD X0, _LIT              ; the codeword is LIT
-	2:
-	  ;; { X0: codeword, W6: literal flag, X5: number }
-	  ;; are we compiling or executing?
-	  KLOAD X2, var_STATE
-	  LDR X2, [X2]
-	  CMP X2, #0
-	  B.EQ 4f                    ; jump if executing
-	  ;; { X0: codeword, W6: literal flag, X5: number }
-	  ;; compiling - just append the word in X0 to the current dictionary definition
-	  BL _COMMA
-	  CMP W6, #0                  ; was it a literal?
-	  B.EQ 3f
-	  MOV X0, X5
-	  BL _COMMA
-	3:
-	  NEXT
-	4:
-	  ;; { W6: literal flag }
-	  ;; executing - run it!
-	  CMP W6, #0
-	  B.NE 5f
-	  ;; not a literal, execute it now
-	  ;; this never returns but the codeword will eventually
-	  ;; call NEXT which will re-enter the loop in QUIT
-	  LDR X1, [X0] ; X0 = DOCOL
-	  BLR X1
-	5:
-	  ;; executing a literal <=> push it on the stack
-	  ;; { X5: number }
-	  PUSH X5
-	  NEXT
-	6:
-	  ;; parse error (not a known word or a number in the current BASE)
-	  ;; print error message followed by up to 40 characters of context
-	  KPRINT "PARSE ERROR: "
-	  KLOAD X2, currkey
-	  LDR X2, [X2]                ; get value of currkey
+    CMP W5, #0
+    B.NE 4f                     ; if IMMEDIATE, jump straight to executing
+    B 2f
+    ;; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+  1:
+    ;; not in the dictionary (not a word) so assume it's a literal number
+    BL _NUMBER                  ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
+    MOV W6, #1
+    CMP X1, #0
+    B.GT 6f
+    MOV X5, X0                  ; store number in X5
+    KLOAD X0, _LIT              ; the codeword is LIT
+  2:
+    ;; { X0: codeword, W6: literal flag, X5: number }
+    ;; are we compiling or executing?
+    KLOAD X2, var_STATE
+    LDR X2, [X2]
+    CMP X2, #0
+    B.EQ 4f                    ; jump if executing
+    ;; { X0: codeword, W6: literal flag, X5: number }
+    ;; compiling - just append the word in X0 to the current dictionary definition
+    BL _COMMA
+    CMP W6, #0                  ; was it a literal?
+    B.EQ 3f
+    MOV X0, X5
+    BL _COMMA
+  3:
+    NEXT
+  4:
+    ;; { W6: literal flag }
+    ;; executing - run it!
+    CMP W6, #0
+    B.NE 5f
+    ;; not a literal, execute it now
+    ;; this never returns but the codeword will eventually
+    ;; call NEXT which will re-enter the loop in QUIT
+    LDR X1, [X0] ; X0 = DOCOL
+    BLR X1
+  5:
+    ;; executing a literal <=> push it on the stack
+    ;; { X5: number }
+    PUSH X5
+    NEXT
+  6:
+    ;; parse error (not a known word or a number in the current BASE)
+    ;; print error message followed by up to 40 characters of context
+    KPRINT "PARSE ERROR: "
+    KLOAD X2, currkey
+    LDR X2, [X2]                ; get value of currkey
     MOV X1, X2
-	  KLOAD X0, buffer
-	  SUB X2, X2, X0              ; X2 = currkey - buffer (chars processed)
-	  CMP X2, #40                 ; cap at 40 chars
-	  B.LE 7f
-	  MOV X2, #40
-	7:
+    KLOAD X0, buffer
+    SUB X2, X2, X0              ; X2 = currkey - buffer (chars processed)
+    CMP X2, #40                 ; cap at 40 chars
+    B.LE 7f
+    MOV X2, #40
+  7:
     SUB X1, X1, X2
-	  SUB X2, X2, #1
-	  MOV X0, #2 ; stderr
-	  MOV X16, #4 ; write
-	  SVC 0
-	8:
-	  KPRINT "■"                  ; insert your favorite delimiter here
-	  KLOAD X2, bufftop
-	  LDR X2, [X2]
-	  KLOAD X1, currkey
-	  LDR X1, [X1]
-	  SUB X2, X2, X1              ; X2 = bufftop - curkey
-	  CMP X2, #40
-	  B.LE 9f
-	  MOV X2, #40
-	9:
-	  MOV X0, #2 ; stderr
-	  MOV X16, #4
-	  SVC 0
-	  KPRINT "\n"
-	  NEXT
+    SUB X2, X2, #1
+    MOV X0, #2 ; stderr
+    MOV X16, #4 ; write
+    SVC 0
+  8:
+    KPRINT "■"                  ; insert your favorite delimiter here
+    KLOAD X2, bufftop
+    LDR X2, [X2]
+    KLOAD X1, currkey
+    LDR X1, [X1]
+    SUB X2, X2, X1              ; X2 = bufftop - curkey
+    CMP X2, #40
+    B.LE 9f
+    MOV X2, #40
+  9:
+    MOV X0, #2 ; stderr
+    MOV X16, #4
+    SVC 0
+    KPRINT "\n"
+    NEXT
 
 _set_up_data_segment:
   KLOAD   X0, var_HERE
