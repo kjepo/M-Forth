@@ -74,6 +74,8 @@
   ;; In other assemblers it means "advance location until address % n == 0"
 
 
+  //	#define STACKWARNING 1
+
   #include "kload.s"
   #include "kprint.s"
   #include "pushpop.s"
@@ -88,10 +90,14 @@
   .global _main                 ; Provide program starting address to linker
   .balign 8                     ; MacOS (and see footnote on align further up)
 _main:
-  BL  _set_up_data_segment
-  KLOAD X9, return_stack_top
-  KLOAD X8, MTEST19
+  MOV X0, SP
+  KLOAD X9, var_S0
+	STR X0, [X9]                  ; let S0 = initial SP
+  KLOAD X9, return_stack_top    ; X9 = initial RSP
+  KLOAD X8, COLDSTART           ; calls QUIT which starts the REPL
+  BL  _set_up_data_segment      ; initialize HERE = next available word in data segment
   NEXT        // won't return
+
 
 DOCOL:
   PUSHRSP X8
@@ -772,6 +778,10 @@ _PRINTWORD2:
 
   .data
   .balign  8
+
+COLDSTART:
+  .quad QUIT
+
 MTEST2:
   .quad   _LIT
   .quad 4
@@ -953,7 +963,7 @@ MTEST18:                        ; generate randoms number between 0 and 100
   .quad -64                     ; jump 64/8 == 8 instructions backwards
   .quad HALT
 
-MTEST19:
+MTEST19:                        ; testing the interpreter
   .quad RZ
   .quad RSPSTORE
   .quad QUIT

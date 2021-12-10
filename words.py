@@ -310,9 +310,6 @@ prev = mkword("HIDE", "HIDE", [ "WORD", "FIND", "HIDDEN", "EXIT" ])
 prev = mkword("QUIT", "QUIT", [
     "RZ", "RSPSTORE",           # R0 RSP! - clear the return stack
     "INTERPRET",                # interpret the next word
-#    "_LATEST",
-#    "FETCH",
-#    "PRINTWORD",
     "BRANCH", "-16"             # ... and loop (indefinitely)
     ])
 
