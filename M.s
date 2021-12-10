@@ -1,36 +1,36 @@
-//------------------------------------------------
-//
-//    M FORTH for the M1 processor on MacOS X
-//
-//    Copyright (C) K.Post kjell@irstafoto.se
-//
-//                    Abstract
-//
-//     M Forth is an implementation of Forth
-//     for the M1 ARM  processor on MacOS X.
-//     The idea is to bootstrap a reasonably
-//     capable language from zero. This is a
-//     first in a series of documents on the
-//     implementation on computer languages.
-//
-//------------------------------------------------
-//
-// 1. WHAT IS M1?
-//
-// The M1 ("Apple Silicon") is the first Apple ARM processor.
-// It is a 64-bit processor with registers X0-X30:
-//  X0-X7 For function parameters.
-//  X0-X18  Registers that a function is free to use without saving.
-//  X19-X30 These are callee saved so must be pushed to a stack if used.
-//  SP  is the stackpointer
-//  LR  is the link register and holds the return address
-//  PC  is the program counter
-// Note that while, e.g., X7 is the full 64 bits of data, W7 is the lower 32 bits.
-//
-// Each ARM instruction is 32 bits long.
-//
-// The ARM is a load/store architecture, i.e., operations like adding, shifting, etc are
-// performed on registers and the only instructions interacting with memory are load/store.
+  ;; ------------------------------------------------
+  ;;
+  ;;     M FORTH for the M1 processor on MacOS X
+  ;;
+  ;;     Copyright (C) K.Post kjell@irstafoto.se
+	;;
+  ;;                     Abstract
+	;;
+  ;;      M Forth is an implementation of Forth
+  ;;      for the M1 ARM  processor on MacOS X.
+  ;;      The idea is to bootstrap a reasonably
+  ;;      capable language from zero. This is a
+  ;;      first in a series of documents on the
+  ;;      implementation on computer languages.
+  ;; ------------------------------------------------
+
+  ;;  1. WHAT IS M1?
+  ;;
+  ;;  The M1 ("Apple Silicon") is Apple's first ARM processor.
+  ;;  It is a 64-bit processor with registers X0-X30:
+  ;;    X0-X7 For function parameters.
+  ;;    X0-X18  Registers that a function is free to use without saving.
+  ;;    X19-X30 These are callee saved so must be pushed to a stack if used.
+  ;;    SP  is the stackpointer
+  ;;    LR  is the link register and holds the return address
+  ;;    PC  is the program counter
+  ;;  Note that, e.g., X7 is the full 64 bits of data, W7 is the lower 32 bits.
+  ;;
+  ;;  Each ARM instruction is 32 bits long.
+  ;;
+  ;;  The ARM is a load/store architecture, i.e., operations like adding,
+  ;;  shifting, etc are performed on registers and the only instructions
+  ;;  interacting with memory are load/store.
 
   ;; ARM Notes
   ;; =========
@@ -55,7 +55,7 @@
   ;; X8 is the instruction pointer (IP)       (%esi in Jones Forth)
   ;; X9 is the return stack pointer (SP)      (%ebp in Jones Forth)
   ;; SP (X13) is the data stack pointer (RSP) (%esp in Jones Forth)
-  ;; 
+  ;;
 
   ;; On MacOS you can't use ADR to load an address into the register,
   ;; since a 64-bit address won't fit into a 32-bit instruction so
@@ -279,7 +279,7 @@ bufftop:
       goto l2;
       *len = p - word_buffer;
       return word_buffer;
-  l4: 
+  l4:
       if (key() != '\n') goto l3;
       goto l1;
   }
@@ -423,7 +423,7 @@ _EMITWORD:      // upon entering: X1 = buffer, X2 = length
 
   ;; FIND dictionary entry, given string
   ;; X1 = address of string
-  ;; X2 = length of string 
+  ;; X2 = length of string
   ;; FIND uses:
   ;; X0 = copy of X1
   ;; X3 = copy of X1
@@ -554,7 +554,7 @@ _COMMA:                         ; store X3 in current dictionary definition
 	  MOV X5, #0                  ; fixme: remove?
 	  LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
 	  AND W5, W5, F_IMMED
-debug1: 
+debug1:
 	  CMP W5, #0
 	  B.NE 4f                     ; if IMMEDIATE, jump straight to executing
 	  B 2f
@@ -696,14 +696,14 @@ _CODEWORDS:                     ; print first few codewords at X0
   LDR     X0, [X5], #8
   BL      printhex
   BL      _CR
-  
+
   POP     LR
   RET
 
 
 
 
-_PRINTWORD: 
+_PRINTWORD:
   PUSH      X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
   BL        _PRINTWORD2
   POP       LR %% POP X3 %% POP X2 %% POP X1 %% POP X0
@@ -772,235 +772,14 @@ _PRINTWORD2:
   B         _PRINTWORD2                  ; continue with previous word
 
 
-  //==================================================
-  // Test suites
-  //==================================================
-
   .data
   .balign  8
 
 COLDSTART:
   .quad QUIT
 
-MTEST2:
-  .quad   _LIT
-  .quad 4
-  .quad   QUADRUPLE
-  .quad   DOT
-  .quad   HALT
-  .quad   EXIT
 
-MTEST3:
-  .quad   _LIT
-  .quad 2
-  .quad _LIT
-  .quad   3
-  .quad   TIMES
-  .quad   DOT
-  .quad   HALT
-  .quad   EXIT
-
-MTEST4:
-  .quad   _LIT
-  .quad 3
-  .quad   QUADRUPLE
-  .quad   DOT
-  .quad HALT
-  .quad EXIT
-
-MTEST5:
-  .quad   _LIT
-  .quad 3
-  .quad   _LIT
-  .quad 4
-  .quad NEQ
-  .quad   DOT
-  .quad HALT
-  .quad EXIT
-
-MTEST6:
-  .quad   _LIT
-  .quad 65
-  .quad   EMIT
-  .quad HALT
-  .quad EXIT
-
-MTEST7:
-  .quad   KEY // 1
-  .quad EMIT
-  .quad   KEY // 2
-  .quad EMIT
-  .quad   KEY // 3
-  .quad EMIT
-  .quad   KEY // 4
-  .quad EMIT
-  .quad   KEY // 5
-  .quad EMIT
-  .quad   KEY // 6
-  .quad EMIT
-  .quad HALT
-  .quad EXIT
-
-MTEST8:
-  .quad WORD
-  .quad EMITWORD
-  .quad _LIT
-  .quad 10
-  .quad EMIT
-  .quad WORD
-  .quad EMITWORD
-  .quad _LIT
-  .quad 10
-  .quad EMIT
-  .quad HALT
-  .quad EXIT
-
-MTEST9:
-  .quad WORD
-  .quad NUMBER
-  .quad DROP
-  .quad WORD
-  .quad NUMBER
-  .quad DROP
-  .quad   PLUS
-  .quad DOT
-  .quad HALT
-  .quad EXIT
-
-MTEST10:
-  .quad RZ
-  .quad DOT
-  .quad HALT
-
-MTEST11:
-  .quad BASE
-  .quad   FETCH
-  .quad DOT
-  .quad VERSION
-  .quad DOT
-  .quad _LATEST
-  .quad FETCH
-  .quad DOT
-  .quad HALT
-
-MTEST12:
-  .quad WORD
-  .quad FIND    // get dictionary address of first word
-  .quad   DUP   // make 2 copies
-  .quad   DUP
-  .quad PRINTWORD
-  .quad DOT   // print address of dictionary entry
-  .quad   TCFA
-  .quad DOT   // print code field address
-  .quad   TDFA
-  .quad DOT   // print data field
-  .quad HALT
-
-MTEST13:
-  .quad   WORD
-  .quad CREATE
-  .quad HALT
-
-MTEST14:
-  .quad   _LBRAC
-  .quad STATE
-  .quad FETCH
-  .quad DOT
-  .quad   _RBRAC
-  .quad STATE
-  .quad FETCH
-  .quad DOT
-  .quad HALT
-
-MTEST15:
-  .quad COLON
-  .quad   _LATEST
-  .quad FETCH
-  .quad DUP
-  .quad DUP
-  .quad HIDDEN
-  .quad PRINTWORD
-  .quad IMMEDIATE
-  .quad PRINTWORD
-  .quad HALT
-
-MTEST16:
-  .quad WORD
-  .quad FIND
-  .quad PRINTWORD
-  .quad TICK
-  .quad DUP // doesn't work: TICK returns address of DUP's codeword, not dict entry
-  .quad PRINTWORD
-  .quad HALT
-
-MTEST17:
-  .quad _LIT
-  .quad 255
-  .quad _LIT
-  .quad 10
-  .quad DIVMOD
-  .quad DOT
-  .quad DOT
-  .quad RND
-  .quad DUP
-  .quad DOT
-  .quad _LIT
-  .quad 10
-  .quad DIVMOD
-  .quad DOT
-  .quad DOT
-  .quad HALT
-
-MTEST18:                        ; generate randoms number between 0 and 100
-  .quad RANDOMIZE
-  .quad RND
-  .quad _LIT
-  .quad 100
-  .quad DIVMOD
-  .quad DROP
-  .quad DOT
-  .quad BRANCH
-  .quad -64                     ; jump 64/8 == 8 instructions backwards
-  .quad HALT
-
-MTEST19:                        ; testing the interpreter
-  .quad RZ
-  .quad RSPSTORE
-  .quad QUIT
-  .quad HALT
-
-MTEST20:
-  .quad _LITSTRING
-  .quad 5
-  .ascii "Hello"
-  .quad TELL
-  .quad _LITSTRING
-  .quad 7
-  .ascii " world\n"
-  .quad TELL
-  .quad HALT
-
-MTEST21:                        ; print all integers from 9 .. 0
-  .quad _LIT
-  .quad 10                      ; 10
-  .quad _LIT                    ; 10  <-------,
-  .quad -1                      ; 10 -1       |
-  .quad PLUS                    ; 9           |
-  .quad DUP                     ; 9 9         |
-  .quad DOT                     ; 9           |
-  .quad DUP                     ; 9 9         |
-  .quad ZBRANCH                 ; 9           |
-  .quad 3*8                     ; ----,       |
-  .quad BRANCH                  ;     |       |
-  .quad -9*8                    ; ----+-------'
-  .quad HALT                    ; <---'
-
-MTEST22:
-  .quad DEBUG
-  .quad HALT
-
-
-  // The BSS segment won't add to the binary's size
+  ;;  The BSS segment won't add to the binary's size
   .bss
 data_segment:
   .space INITIAL_DATA_SEGMENT_SIZE
