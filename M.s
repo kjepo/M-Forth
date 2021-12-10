@@ -54,17 +54,17 @@
   ;; X2 is commonly used for storing the length of the string
   ;; X8 is the instruction pointer (IP)       (%esi in Jones Forth)
   ;; X9 is the return stack pointer (SP)      (%ebp in Jones Forth)
-  ;; SP (X13) is the data stack pointer (RSP) (%esp in Jones Forth)
-  ;;
+  ;; SP is the data stack pointer (RSP)       (%esp in Jones Forth)
+  ;; X19 is used when STACKWARNING has been enabled (see pushpop.s)
 
   ;; On MacOS you can't use ADR to load an address into the register,
-  ;; since a 64-bit address won't fit into a 32-bit instruction so
-  ;; this operation is done in two steps: first load the address of
-  ;; the page, then add the offset.  I guess it's possible to design
-  ;; a 32-bit FORTH by sticking to one 32-bit address space, but
-  ;; this is not something I have investigated.
+  ;; since a 64-bit address won't fit into the instruction.
+  ;; Therefore, this operation is done in two steps: first load the
+  ;; address of the page, then add the offset.  I guess it's possible
+  ;; to design a 32-bit FORTH by sticking to one 32-bit address space,
+  ;; but this is not something I have investigated.
 
-  ;; footnote: this is how cc compiles it:
+  ;; footnote: this is how clang compiles loading a 64-bit address:
   ;; adrp x19, _buffer@GOTPAGE
   ;; ldr  x19, [x19, _buffer@GOTPAGEOFF]
 
@@ -72,14 +72,15 @@
   ;; .align n   means different things in different assemblers
   ;; In this assembler, it means "advance location until n least significant bits are 0".
   ;; In other assemblers it means "advance location until address % n == 0"
-
-
-  //	#define STACKWARNING 1
+  ;; Here we use .balign which explicitly has the latter meaning.
 
   #include "kload.s"
   #include "kprint.s"
   #include "pushpop.s"
   #include <sys/syscall.h>
+
+	;; NEXT is the heart of the inner interpreter.
+  ;; It fetches and jumps to the next instruction.
 
   .macro  NEXT
   LDR X0, [X8], #8
@@ -90,14 +91,13 @@
   .global _main                 ; Provide program starting address to linker
   .balign 8                     ; MacOS (and see footnote on align further up)
 _main:
-  MOV X0, SP
+  MOV   X0, SP
   KLOAD X9, var_S0
-	STR X0, [X9]                  ; let S0 = initial SP
+	STR   X0, [X9]                ; let S0 = initial SP
   KLOAD X9, return_stack_top    ; X9 = initial RSP
   KLOAD X8, COLDSTART           ; calls QUIT which starts the REPL
-  BL  _set_up_data_segment      ; initialize HERE = next available word in data segment
-  NEXT        // won't return
-
+  BL    _set_up_data_segment    ; initialize HERE = next available word in data segment
+  NEXT                          ; won't return
 
 DOCOL:
   PUSHRSP X8
@@ -105,13 +105,13 @@ DOCOL:
   NEXT
 
   .set M_VERSION,1
-	;; the size of the return stack will increase the executable
+	;; the size of the return stack _will_ increase the executable
   .set RETURN_STACK_SIZE, 1048576 // 65536 // 8192
-  .set BUFFER_SIZE,4096 // input buffer
-  .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024     // 1 MB
-  .set  F_IMMED,0x80    // three masks for the length field [*] below
-  .set  F_HIDDEN,0x20
-  .set  F_LENMASK,0x1f    // length mask
+  .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024 ; 1 MB
+  .set BUFFER_SIZE,4096         ; input buffer
+  .set F_IMMED,0x80             ; three masks for the length field [*] below
+  .set F_HIDDEN,0x20
+  .set F_LENMASK,0x1f           ; length mask
         .set    link, 0
 
   .text
