@@ -48,14 +48,14 @@ def mkconstaddr(name, label, value, flags=0):
 
 def mkvar(name, label, initial=0, flags=0):
     return mkcode(name, label, [
-    		 "KLOAD X0, var_" + name,
+   		 "KLOAD X0, var_" + name,
 		 "PUSH X0",
 		 "NEXT",
 		 ".data",
 		 ".balign 8",
 		 "var_" + name + ":",
 		 ".quad " + str(initial)
-		 ], flags)
+	 ], flags)
 
 prev = mkcode("EXIT", "EXIT", ["POPRSP X8", "NEXT"])
 prev = mkcode("+", "PLUS", ["POP X0", "POP X1", "ADD X0, X1, X0", "PUSH X0", "NEXT"])
@@ -72,7 +72,6 @@ prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
 
-
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
 prev = mkcode("LIT", "_LIT", ["LDR X0, [X8], #8", "PUSH X0", "NEXT"])
@@ -85,10 +84,31 @@ prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 # replace CSETM with CSET below.
 
 # ( a b -- a ) top two words are equal?
-prev = mkcode("=", "EQU", ["POP	X0", "POP X1", "CMP X1, X0", "CSETM X0, EQ", "PUSH X0", "NEXT"])
+prev = mkcode("=", "EQU", [
+    "POP	X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, EQ",
+    "PUSH X0",
+    "NEXT"])
+
 # ( a b -- a ) top two words not equal?
-prev = mkcode("<>", "NEQ", ["POP X0", "POP X1", "CMP X1, X0", "CSETM X0, NE", "PUSH X0", "NEXT"])
-prev = mkcode("<", "_LT", [ "POP X0", "POP X1", "CMP X1, X0", "CSETM X0, LT", "PUSH X0", "NEXT"])
+prev = mkcode("<>", "NEQ", [
+    "POP X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, NE",
+    "PUSH X0",
+    "NEXT"])
+
+prev = mkcode("<", "_LT", [
+    "POP X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, LT",
+    "PUSH X0",
+    "NEXT"])
+
 prev = mkcode("0=", "ZEQU", [   # top of stack equals 0?
     "POP X0",
     "CMP X0, #0",
@@ -106,7 +126,8 @@ prev = mkcode("KEY", "KEY", ["BL _KEY", "PUSH X0", "NEXT"])
 # read next word from stdin (up until whitespace)
 prev = mkcode("WORD", "WORD", ["BL _WORD", "PUSH X1", "PUSH X2", "NEXT"])
 
-# NUMBER ( addr length -- n e ) convert string -> number: n is parsed number, e is nr of unparsed chars
+# NUMBER ( addr length -- n e )
+# convert string -> number: n is parsed number, e is nr of unparsed chars
 prev = mkcode("NUMBER", "NUMBER", ["POP X1", "POP X0", "BL _NUMBER", "PUSH X0", "PUSH X1", "NEXT"])
 
 # EMIT ( a -- ) emit top of stack as ASCII
@@ -116,7 +137,6 @@ prev = mkcode("EMITWORD", "EMITWORD", ["POP X2", "POP X1", "BL _EMITWORD", "NEXT
 
 # fixme: rewrite this as a mkword using _LIT 10, EMIT
 #prev = mkcode("CR", "CR", ["BL _CR", "NEXT"])   # ( -- ) print carriage return
-
 
 prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
     "POP  X0",
@@ -138,9 +158,6 @@ prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary ent
     "NEXT"])
 
 prev = mkcode(">CFA", "TCFA", ["POP X0", "BL _TCFA", "PUSH X0", "NEXT"])
-
-prev = mkcode("PRINTWORD", "PRINTWORD", [    # ( addr -- ) prints info on dictionary entry
-    "POP  X1", "BL   _PRINTWORD", "NEXT"])
 
 prev = mkcode("CREATE", "CREATE", [    # ( addr length -- ) creates header for word
     "POP X1",		# length
@@ -219,7 +236,6 @@ prev = mkcode("/MOD", "DIVMOD", [
     "PUSH X2",                  # push quotient
     "NEXT" ])
 
-
 # RND ( -- n ) generate a 64-bit random number
 prev = mkcode("RND", "RND", [
     "KLOAD X1, var_RNDSEED",        # get current state
@@ -272,19 +288,6 @@ prev = mkcode("EXECUTE", "EXECUTE", [
     "BLR  X1"                   # jump to it
 ])
 
-prev = mkword("DEBUG", "DEBUG", [  # DEBUG <enter> PLUS <enter>
-    "WORD",
-    "FIND",
-    "PRINTWORD",
-])
-
-prev = mkword("DEBUGLATEST", "DEBUGLATEST", [  # DEBUGLATEST 
-    "_LATEST",
-    "FETCH",
-    "PRINTWORD",
-])
-
-
 prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
@@ -312,9 +315,6 @@ prev = mkword("QUIT", "QUIT", [
     "INTERPRET",                # interpret the next word
     "BRANCH", "-16"             # ... and loop (indefinitely)
     ])
-
-
-
 
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")

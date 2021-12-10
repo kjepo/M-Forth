@@ -75,8 +75,6 @@
   ;; Here we use .balign which explicitly has the latter meaning.
 
   #include "kload.s"
-  #include "kprint.s"
-  #include "pushpop.s"
   #include <sys/syscall.h>
 
   ;; NEXT is the heart of the inner interpreter.
@@ -99,10 +97,20 @@ _main:
   BL    _set_up_data_segment    ; initialize HERE = next available word in data segment
   NEXT                          ; won't return
 
+  #include "kprint.s"
+  #include "pushpop.s"
+
+
+
+  .text
+  .balign 8
+
 DOCOL:
   PUSHRSP X8
   ADD X8, X0, #8
   NEXT
+
+  #include "printhex.s"
 
   .set M_VERSION,1
   ;; the size of the return stack _will_ increase the executable
@@ -112,61 +120,7 @@ DOCOL:
   .set F_IMMED,0x80             ; three masks for the length field [*] below
   .set F_HIDDEN,0x20
   .set F_LENMASK,0x1f           ; length mask
-        .set    link, 0
 
-  .text
-  .balign 8
-printhex:
-  // printhex -- print reg X0 as 16 char hex string 000000000000002A
-  // X1: pointer to output buffer hexbuf
-  // W2: scratch register
-  // X3: pointer to hex characters hexchars
-  // W4: holds next hex digit
-  // W5: loop counter
-  // Note 1: W2 is the lower 32-bit word of 64-bit register X2
-  // Note 2: printhex is a leaf function, no need to save LR
-
-  PUSH  LR
-  PUSH  X1
-  PUSH  X2
-  PUSH  X3
-  PUSH  X4
-  PUSH  X5
-
-  KLOAD   X1, hexbuf    // X1 = &hexbuf
-  ADD     X1, X1, #15   // X1 = X1 + 15 (length of hexbuf)
-  MOV     W5, #16     // loop counter: 16 characters to print
-printhex1:
-  AND     W2, W0, #0xf    // W2 = W0 & 0xf   LLDB: reg read x0, x2
-  KLOAD   X3, hexchars    // LLDB: mem read $x3
-  LDR     W4, [X3, X2]    // W4 = *[X3 + X2]
-  STRB    W4, [X1]    // *X1 = W4
-  SUB     X1, X1, #1    // X1 = X1 - 1
-  LSR     X0, X0, #4    // X0 = X0 >> 4
-  SUBS    W5, W5, #1    // X5 = X5 - 1 (update condition flags)
-  B.NE    printhex1   // if X5 != 0 GOTO printhex1
-
-  // Print string hexbuf
-  MOV     X0, #1        // 1 = StdOut
-  KLOAD   X1, hexbuf    // string to print
-  MOV     X2, #16     // length of our string
-  MOV     X16, #4         // MacOS write system call
-  SVC     0           // Output the string
-
-  POP X5
-  POP X4
-  POP X3
-  POP X2
-  POP X1
-  POP LR
-
-  RET
-
-hexchars:
-  .ascii  "0123456789ABCDEF"
-  .data
-hexbuf:
-  .ascii  "0000000000000000"
 
   .balign 8                      ; FIXME: Align to page size
 return_stack:
@@ -663,114 +617,6 @@ _RANDOMIZE:
 
 urandom:
   .asciz "/dev/urandom"
-
-  .balign 8
-  ;;                  ^
-  ;; +------------+   |
-  ;; | PREVIOUS --+---'
-  ;; +------------+
-  ;; |LENGTH+FLAGS|
-  ;; +------------+
-  ;; |'F' 'O' 'O' |
-  ;; +------------+
-  ;; | CODEWORD --+--,
-  ;; +------------+  |
-  ;; |            |<-'
-  ;; |    BODY    |
-  ;; |            |
-  ;; +------------+
-  ;;
-
-_CODEWORDS:                     ; print first few codewords at X0
-  PUSH    LR
-  KPRINT  "codeword: "
-  MOV     X5, X0
-  LDR     X0, [X5], #8
-  BL      printhex
-  BL      _CR
-  KPRINT  "        : "
-  LDR     X0, [X5], #8
-  BL      printhex
-  BL      _CR
-  KPRINT  "        : "
-  LDR     X0, [X5], #8
-  BL      printhex
-  BL      _CR
-
-  POP     LR
-  RET
-
-
-
-
-_PRINTWORD:
-  PUSH      X0 %% PUSH X1 %% PUSH X2 %% PUSH X3 %% PUSH LR
-  BL        _PRINTWORD2
-  POP       LR %% POP X3 %% POP X2 %% POP X1 %% POP X0
-  RET
-
-
-_PRINTWORD2:
-  // X1 -> beginning of dictionary entry
-  CMP X1, #0
-  BNE 1f
-  RET
-1:
-  PUSH      LR
-  KPRINT    "start:    "
-  MOV       X0, X1
-  BL        printhex
-  BL        _CR
-  KPRINT    "previous: "
-  LDR       X0, [X1], #8
-  PUSH      X0              ; save ptr to previous word in X5
-  BL        printhex
-  BL        _CR
-
-  KPRINT    "length:   "
-  MOV       X0, #0
-  LDRB      W0, [X1]
-  AND       W0, W0, F_LENMASK // length
-  MOV       X2, X0  // len
-  BL        printhex
-
-  KPRINT    ", immediate="
-  LDRB      W0, [X1]
-  AND       W0, W0, F_IMMED // immediate mask
-  ASR       W0, W0, #7
-  ADD       W0, W0, '0'
-  BL        _EMIT
-
-  KPRINT    ", hidden="
-  LDRB      W0, [X1], #1
-  AND       W0, W0, F_HIDDEN  // hidden mask
-  ASR       W0, W0, #5
-  ADD       W0, W0, '0'
-  BL        _EMIT
-  BL        _CR
-
-  PUSH      X1
-  KPRINT    "name:     "
-  MOV       X3, X1
-  MOV       X0, #1  // stdout
-  MOV       X1, X3  // str
-  MOV       X16, #4
-  SVC       0
-  POP       X1
-  BL        _CR
-
-  ADD       X1, X1, X2
-  ADD       X1, X1, #7
-  AND       X1, X1, #~7
-  LDR       X0, [X1]
-  BL        _CODEWORDS
-
-  BL        _CR
-  BL        _CR
-  POP       X1
-  POP       LR
-  B         _PRINTWORD2                  ; continue with previous word
-
 
   .data
   .balign  8
