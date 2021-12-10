@@ -7,7 +7,8 @@ M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 <br>
 <b>Update:</b> As of 2021-12-06 M-Forth is now capable of running
 all the code in <tt>stdlib.f</tt>. Not all primitives are ready though,
-and documentation is still incomplete.
+and documentation is still incomplete. The primitive "." prints in hex
+until I've written the proper definition in <tt>stdlib.f</tt>.
 </p>
 
 ## Introduction and background
