@@ -620,7 +620,6 @@ urandom:
 
   .data
   .balign  8
-
 COLDSTART:
   .quad QUIT
 

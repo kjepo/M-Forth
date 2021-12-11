@@ -221,9 +221,6 @@
 
 ( This is a comment ( and you can nest them too! ) )
 
-
-          
-
 : ABS DUP 0 < IF NEGATE THEN ;
 : COUNTDOWN DUP 1 <
        IF QUIT
@@ -242,4 +239,44 @@
   AGAIN
 ;
 
+( This is the underlying recursive definition of U. )
+: U.            ( u -- )
+        BASE @ /MOD     ( width rem quot )
+	?DUP IF                 ( if quotient <> 0 then )
+                RECURSE         ( print the quotient )
+        THEN
 
+	( print the remainder )
+        DUP 10 < IF
+                '0'             ( decimal digits 0..9 )
+        ELSE
+                10 -            ( hex and beyond digits A..Z )
+		'A'
+        THEN
+	+
+        EMIT
+;
+
+: NIP ( x y -- y ) SWAP DROP ;
+: TUCK ( x y -- y x y ) SWAP OVER ;
+: PICK ( x_u ... x_1 x_0 u -- x_u ... x_1 x_0 x_u )
+  1+              ( add one because of 'u' on the stack )
+  16 *            ( multiply by the word size )
+  DSP@ +          ( add to the stack pointer )
+  @               ( and fetch )
+;
+
+( With the looping constructs, we can now write SPACES, which writes n spaces to stdout. )
+: SPACES          ( n -- )
+  BEGIN
+    DUP 0>        ( while n > 0 )
+  WHILE
+    SPACE         ( print a space )
+    1-            ( until we count down to 0 )
+  REPEAT
+  DROP
+;
+
+( Standard words for manipulating BASE. )
+: DECIMAL ( -- ) 10 BASE ! ;
+: HEX ( -- ) 16 BASE ! ;

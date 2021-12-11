@@ -64,6 +64,16 @@ prev = mkcode("*", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0", "N
 prev = mkcode("1+", "INCR", ["POP X0", "ADD X0, X0, #1", "PUSH X0", "NEXT"])
 prev = mkcode("1-", "DECR", ["POP X0", "SUB X0, X0, #1", "PUSH X0", "NEXT"])
 prev = mkcode("DUP", "DUP", ["POP X0", "PUSH X0", "PUSH X0", "NEXT"])
+
+prev = mkcode("?DUP", "QDUP", [  # duplicate top of stack if non-zero
+    "POP X0",
+    "PUSH X0",
+    "CMP X0, #0",
+    "B.EQ 1f",
+    "PUSH X0",
+    "1: NEXT"
+])
+
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
 prev = mkcode("SWAP", "SWAP", ["POP X0", "POP X1", "PUSH X0", "PUSH X1", "NEXT"])
 prev = mkcode("OVER", "OVER", ["POP X0", "POP X1", "PUSH X1", "PUSH X0", "PUSH X1", "NEXT"])
@@ -71,6 +81,8 @@ prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
 prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
+prev = mkcode("DSP@", "DSPFETCH", ["MOV X0, SP", "PUSH X0", "NEXT"])
+prev = mkcode("DSP!", "DSPSTORE", ["POP X0", "MOV X0, SP", "NEXT"])
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
@@ -109,10 +121,26 @@ prev = mkcode("<", "_LT", [
     "PUSH X0",
     "NEXT"])
 
-prev = mkcode("0=", "ZEQU", [   # top of stack equals 0?
+prev = mkcode("0=", "ZEQU", [   # top of stack == 0?
     "POP X0",
     "CMP X0, #0",
     "CSETM X0, EQ",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("0>", "ZGT", [   # top of stack > 0?
+    "POP X0",
+    "CMP X0, #0",
+    "CSETM X0, GT",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("0>=", "ZGE", [   # top of stack >= 0?
+    "POP X0",
+    "CMP X0, #0",
+    "CSETM X0, GE",
     "PUSH X0",
     "NEXT"
 ])
