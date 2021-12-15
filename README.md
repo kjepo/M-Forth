@@ -4,13 +4,13 @@
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
 <p>
 <b>Note:</b> This is work in progress and not yet ready for release.
-<br>
-<b>Update:</b> As of 2021-12-06 M-Forth is now capable of running
+<p>
+<b>2021-12-06</b>: M-Forth is now capable of running
 all the code in <tt>stdlib.f</tt>. Not all primitives are ready though,
 and documentation is still incomplete. The primitive "." prints in hex
 until I've written the proper definition in <tt>stdlib.f</tt>.
 </p>
-<b>Update:</b> As of 2021-12-15 M-Forth can now print numbers with
+<b>2021-12-15</b>: M-Forth can now print numbers with
 `.` which respects the number base stored in the `BASE` variable.
 The words `DECIMAL` and `HEX` in `stdlib.f` changes `BASE` to 
 10 or 16, respectively.
