@@ -74,7 +74,29 @@ prev = mkcode("?DUP", "QDUP", [  # duplicate top of stack if non-zero
     "1: NEXT"
 ])
 
+prev = mkcode("ROT", "ROT", [  # rotate top three stack items ( a b c -- b c a )
+    "POP X0",
+    "POP X1",
+    "POP X2",
+    "PUSH X1",
+    "PUSH X0",
+    "PUSH X2",
+    "NEXT"
+])
+
+prev = mkcode("-ROT", "NROT", [  # rotate top three stack items ( a b c -- c a b )
+    "POP X0",
+    "POP X1",
+    "POP X2",
+    "PUSH X0",
+    "PUSH X2",
+    "PUSH X1",
+    "NEXT"
+])
+
+
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
+prev = mkcode("2DROP", "TWODROP", ["POP X0", "POP X0", "NEXT"])
 prev = mkcode("SWAP", "SWAP", ["POP X0", "POP X1", "PUSH X0", "PUSH X1", "NEXT"])
 prev = mkcode("OVER", "OVER", ["POP X0", "POP X1", "PUSH X1", "PUSH X0", "PUSH X1", "NEXT"])
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
@@ -121,10 +143,42 @@ prev = mkcode("<", "_LT", [
     "PUSH X0",
     "NEXT"])
 
+prev = mkcode(">", "_GT", [
+    "POP X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, GT",
+    "PUSH X0",
+    "NEXT"])
+
+prev = mkcode(">=", "_GE", [
+    "POP X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, GE",
+    "PUSH X0",
+    "NEXT"])
+
+prev = mkcode("<=", "_LE", [
+    "POP X0",
+    "POP X1",
+    "CMP X1, X0",
+    "CSETM X0, LE",
+    "PUSH X0",
+    "NEXT"])
+
 prev = mkcode("0=", "ZEQU", [   # top of stack == 0?
     "POP X0",
     "CMP X0, #0",
     "CSETM X0, EQ",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("0<", "ZLT", [   # top of stack < 0?
+    "POP X0",
+    "CMP X0, #0",
+    "CSETM X0, LT",
     "PUSH X0",
     "NEXT"
 ])
@@ -141,6 +195,21 @@ prev = mkcode("0>=", "ZGE", [   # top of stack >= 0?
     "POP X0",
     "CMP X0, #0",
     "CSETM X0, GE",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("AND", "AND", [  
+    "POP X0",
+    "POP X1",
+    "AND X0, X0, X1",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("INVERT", "INVERT", [   # ( a -- ~a ) bitwise NOT
+    "POP X0",
+    "MVN X0, X0",
     "PUSH X0",
     "NEXT"
 ])
@@ -177,6 +246,24 @@ prev = mkcode("!", "STORE", [
     "POP X1",                   # data to store there
     "STR X1, [X0]",             # store it
     "NEXT" ])
+
+prev = mkcode("C!", "STOREBYTE", [
+    "POP X0",                   # address to store at
+    "POP X1",                   # data to store there
+    "STR X1, [X0]",             # store it
+    "NEXT"
+])
+
+prev = mkcode("+!", "ADDSTORE", [
+    "POP X0",                   # address
+    "POP X1",                   # amount to add
+    "LDR X2, [X0]",
+    "ADD X2, X2, X1",
+    "STR X2, [X0]",             # store *X0+X1
+    "NEXT"
+])
+
+
 
 prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string
     "POP  X2",                      # X1 = length
