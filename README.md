@@ -115,3 +115,15 @@ a pointer to a piece of code that handles the word.  What is meant by
 "handling" the word depends on the word being a primitive (written in assembler)
 or not (consisting of links to other words).
 
+# Things to do (unsorted)
+
+- The word size should really be a variable so that the code isn't littered
+with magic numbers like <tt>8</tt> or <tt>7</tt>, or even <tt>~7</tt>.
+In Jones Forth, the corresponding word size is <tt>4</tt> BTW.
+- Another "constant" is the alignment which is 8, i.e., every machine code
+subroutine needs to be aligned to the nearest multiple of 8.
+- Yet another constant is the size of stack elements: the ARM hardware
+requires that the stack pointer is 16-byte aligned.  We're actually
+wasting 8 bytes every time we <tt>PUSH</tt> to the data- or return stack.
+
+
