@@ -117,7 +117,7 @@ or not (consisting of links to other words).
 
 # Things to do (unsorted)
 
-- The word size should really be a constant (<tt>8 CONSTANT WORDSIZE</t>)
+- The word size should really be a constant (<tt>8 CONSTANT WORDSIZE</tt>)
 so that the code isn't littered with magic numbers like
 <tt>8</tt> or <tt>7</tt>, or even <tt>~7</tt>.
 In Jones Forth, the corresponding word size is <tt>4</tt> BTW.
