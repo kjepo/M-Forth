@@ -10,11 +10,17 @@ all the code in <tt>stdlib.f</tt>. Not all primitives are ready though,
 and documentation is still incomplete. The primitive "." prints in hex
 until I've written the proper definition in <tt>stdlib.f</tt>.
 </p>
+<p>
 <b>2021-12-15</b>: M-Forth can now print numbers with <tt>.</tt>
 which respects the number base stored in the <tt>BASE</tt> variable.
 The words <tt>DECIMAL</tt> and <tt>HEX</tt> in <tt>stdlib.f</tt>
 changes <tt>BASE</tt> to 10 or 16, respectively.
 </p>
+<p>
+<b>2021-12-20</b>: Fixed some serious bugs with LITSTRING and >CFA
+so now you can print strings with <tt>." Hello world"</tt>.
+</p>
+
 
 ## Introduction and background
 This document will not explain FORTH in detail

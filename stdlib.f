@@ -37,12 +37,12 @@
 : '-' [ CHAR - ] LITERAL ;
 : '.' [ CHAR . ] LITERAL ;
 
-\ '[COMPILE] word' compiles 'word' if it would otherwise be IMMEDIATEn
+\ '[COMPILE] word' compiles 'word' if it would otherwise be IMMEDIATE
 : [COMPILE] IMMEDIATE
   WORD   \ get the next word
   FIND   \ find it in the dictionary
   >CFA   \ get its codeword
- ,      \ and compile that
+  ,      \ and compile that
 ;
 
 \ RECURSE makes a recursive call to the current word that is being compiled.
@@ -137,10 +137,10 @@
   ,                 \ compile the offset here
 ;
 
-: TEST#3
+: TEST#3            \ Infinite loop of random numbers [0..10[
   RANDOMIZE
   BEGIN
-    RND 10 MOD 
+    RND 10 MOD .
   AGAIN
 ;
 
@@ -249,7 +249,8 @@
   @               ( and fetch )
 ;
 
-( With the looping constructs, we can now write SPACES, which writes n spaces to stdout. )
+( With the looping constructs, we can now write SPACES,
+  which writes n spaces to stdout. )
 : SPACES          ( n -- )
   BEGIN
     DUP 0>        ( while n > 0 )
@@ -270,9 +271,9 @@
  top of the stack and prints it out.  However first I'm going to implement some
  lower-level FORTH words:
 
-   U.R ( u width -- )  which prints an unsigned number, padded to a certain width
-   U.  ( u -- )        which prints an unsigned number
-   .R  ( n width -- )  which prints a signed number, padded to a certain width.
+   U.R ( u width -- ) which prints an unsigned number padded to a certain width
+   U.  ( u -- )       which prints an unsigned number
+   .R  ( n width -- ) which prints a signed number padded to a certain width.
 
  For example:
 
@@ -290,9 +291,9 @@
  Another wrinkle of . and friends is that they obey the current base in the
  variable BASE. BASE can be anything in the range 2 to 36.
 
- While we're defining . &c we can also define .S which is a useful debugging
- tool.  This word prints the current stack (non-destructively) from top to bottom.
- 
+ While we're defining . &c we can also define .S which is a useful debugging 
+ tool.  This word prints the current stack (non-destructively) from top to
+ bottom.
 )
 
 ( This is the underlying recursive definition of U. )
@@ -329,7 +330,8 @@
   DROP
 ;
 
-( This word returns the width (in characters) of an unsigned number in the current base )
+( This word returns the width (in characters) of an unsigned number in
+  the current base )
 : UWIDTH          ( u -- width )
   BASE @ /        ( rem quot )
   ?DUP IF         ( if quotient <> 0 then )
@@ -347,9 +349,10 @@
   SWAP -          ( u width-uwidth )
 
   (
-    At this point if the requested width is narrower, we'll have a negative number on the
-    stack. Otherwise the number on the stack is the number of spaces to print. But SPACES
-    won't print a negative number of spaces anyway, so it's now safe to call SPACES ...
+    At this point if the requested width is narrower, we'll have a negative
+    number on the stack. Otherwise the number on the stack is the number of
+    spaces to print. But SPACES won't print a negative number of spaces anyway,
+    so it's now safe to call SPACES ...
   )
 
   SPACES
@@ -360,8 +363,9 @@
 ;
 
 (
-  .R prints a signed number, padded to a certain width.  We can't just print the sign and
-  call U.R because we want the sign to be next to the number ('-123' instead of '-  123').
+  .R prints a signed number, padded to a certain width.  We can't just print
+  the sign and call U.R because we want the sign to be next to the number
+  ('-123' instead of '-  123').
 )
 : .R              ( n width -- )
   SWAP            ( width n )
@@ -427,8 +431,8 @@
 ( ALIGNED takes an address and rounds it up (aligns it)
   to the next 16 byte boundary )
 : ALIGNED         ( addr -- addr )
-  15 + 
-  15 INVERT AND   ( (addr+15) & ~15 )
+  7 + 
+  7 INVERT AND   ( (addr+7) & ~7 )
 ;
 
 ( ALIGN aligns the HERE pointer, so the next word appended will be aligned )
@@ -463,3 +467,88 @@
   1 HERE +!       ( increment HERE pointer by 1 byte )
 ;
 
+: S" IMMEDIATE    ( -- addr len )
+  STATE @ IF      ( compiling? )
+    ' LITSTRING , ( compile LITSTRING )
+    HERE @        ( save the address of the length word on the stack )
+    0 ,           ( dummy length - we don't know what it is yet )
+    BEGIN
+      KEY         ( get next character of the string )
+      DUP '"' <>
+    WHILE
+      C,          ( copy character )
+    REPEAT
+    DROP          ( drop the double quote character at the end )
+    DUP           ( get the saved address of the length word )
+    HERE @ SWAP - ( calculate the length )
+    8 -           ( subtract padding size (we measured from start of the length word) )
+    SWAP !        ( and back-fill the length location )
+    ALIGN         ( round up to next multiple of 16 bytes for the residual )
+  ELSE            ( immediate mode )
+    HERE @        ( get the start address of the temporary space )
+    BEGIN
+      KEY
+      DUP '"' <>
+    WHILE
+      OVER C!     ( save next character )
+      1+          ( increment address )
+    REPEAT
+    DROP          ( drop the final " character )
+    HERE @ -      ( calculate the length )
+    HERE @        ( push the start address )
+    SWAP          ( addr len )
+  THEN
+;
+
+(
+ ." is the print string operator in FORTH.  Example: ." Something to print"
+ The space after the operator is the ordinary space required between words
+ and is not a part of what is printed.
+
+ In immediate mode we just keep reading characters and printing them until
+ we get to the next double quote.
+
+ In compile mode we use S" to store the string, then add TELL afterwards:
+ LITSTRING <string length> <string rounded up to 16 bytes> TELL
+
+ It may be interesting to note the use of [COMPILE] to turn the call to the
+ immediate word S" into compilation of that word.  It compiles it into the
+ definition of .", not into the definition of the word being compiled when
+ this is running (complicated enough for you?)
+)
+: ." IMMEDIATE    ( -- )
+  STATE @ IF      ( compiling? )
+    [COMPILE] S"  ( read the string, and compile LITSTRING, etc. )
+    ' TELL ,      ( compile the final TELL )
+  ELSE
+    ( In immediate mode, just read characters and print them until we get
+      to the ending double quote. )
+    BEGIN
+      KEY
+      DUP '"' = IF
+        DROP      ( drop the double quote character )
+        EXIT      ( return from this function )
+      THEN
+      EMIT
+    AGAIN
+  THEN
+;
+
+: TEST#6 ." ABC" CR ;
+: TEST#7 ." Hello world!" CR ;
+TEST#6
+TEST#7
+." Testing immediate mode" CR
+
+
+
+
+\ 10 CONSTANT TEN   defines a constant TEN which leaves 10 on the stack )
+: CONSTANT
+  WORD         
+  CREATE       
+  DOCOL ,      
+  ' LIT ,      
+  ,            
+  ' EXIT ,     
+;

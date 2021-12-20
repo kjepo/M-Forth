@@ -99,7 +99,9 @@ prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
 prev = mkcode("2DROP", "TWODROP", ["POP X0", "POP X0", "NEXT"])
 prev = mkcode("SWAP", "SWAP", ["POP X0", "POP X1", "PUSH X0", "PUSH X1", "NEXT"])
 prev = mkcode("OVER", "OVER", ["POP X0", "POP X1", "PUSH X1", "PUSH X0", "PUSH X1", "NEXT"])
-prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
+#prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
+prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "NEXT"])
+prev = mkcode(".8", "DOT8", ["POP X0", "BL printhex8", "NEXT"])
 prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
@@ -367,10 +369,12 @@ prev = mkcode("RANDOMIZE", "RANDOMIZE", [ "BL _RANDOMIZE", "NEXT" ])
 
 # LITSTRING is a primitive used to implement the ." and S" operators (which are written in FORTH).
 prev = mkcode("LITSTRING", "_LITSTRING", [
-    "LDR   X0, [X8], #8",        # get the length of the string
-    "PUSH X8",                   # push addr of start of string
-    "PUSH X0",                   # push length of the string
-    "ADD X8, X0, X8",            # skip past the string
+    "LDR  X0, [X8], #8",        # get the length of the string
+    "PUSH X8",                  # push addr of start of string
+    "PUSH X0",                  # push length of the string
+    "ADD  X8, X0, X8",          # skip past the string
+    "ADD  X8, X8, #7",
+    "AND  X8, X8, #~7",
     "NEXT" ])
 
 # TELL prints a string
@@ -431,6 +435,7 @@ prev = mkword("QUIT", "QUIT", [
     "BRANCH", "-16"             # ... and loop (indefinitely)
     ])
 
+prev = mkconstaddr("DOCOL", "__DOCOL", "DOCOL")
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
 

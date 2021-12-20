@@ -418,7 +418,7 @@ _TCFA:
   LDRB    W1, [X0, #8]!         ; skip link pointer and load length + flags
   AND     W1, W1, F_LENMASK     ; strip the flags
   ADD     X0, X0, X1            ; skip characters
-  ADD     X0, X0, #8            ; skip length & flags (1) and add 7
+  ADD     X0, X0, #8            ; skip length & flags (1 byte) + 7 for align
   AND     X0, X0, #~7           ; ... to make it 8-byte aligned
   RET
 
@@ -426,24 +426,24 @@ _TCFA:
   // X0: address of name
 _CREATE:
   KLOAD   X2, var_LATEST
-  LDR     X2, [X2]              ; X2 = LATEST = latest dictionary entry
+  LDR     X2, [X2]              ; X2 = LATEST = latest dictionary entry (word before this)
   KLOAD   X3, var_HERE
-  LDR     X3, [X3]              ; X3 = HERE = next available place in data segment
+  LDR     X3, [X3]              ; X3 = HERE = the word we are creating
   MOV     X5, X3                ; X5 = copy of original HERE
   STR     X2, [X3], #8          ; *X3++ = LATEST
   MOV     X7, X3
   STRB    W1, [X3], #1          ; *X3++ = length
 1:
-  LDRB    W2, [X0], #1
+  LDRB    W2, [X0], #1		; *X3++ = *X0++ copy name
   STRB    W2, [X3], #1
   SUBS    X1, X1, #1
   B.NE    1b
   ADD     X3, X3, #7
   AND     X3, X3, ~7
   KLOAD   X2, var_LATEST
-  STR     X5, [X2]  // LATEST = original HERE
+  STR     X5, [X2]  		; LATEST = what we just defined
   KLOAD   X4, var_HERE
-  STR     X3, [X4]  // HERE = X3
+  STR     X3, [X4]  		; HERE = X3 = ready for body of this word
   RET
 
   // X0 = code pointer to store
@@ -495,6 +495,7 @@ _COMMA:                         ; store X3 in current dictionary definition
     ;; is the word in the dictionary?
     PUSH X1
     PUSH X2
+debug1:	
     BL _FIND                      ; { X4: header (0 if not found) }
     POP X1
     POP X0
@@ -508,7 +509,6 @@ _COMMA:                         ; store X3 in current dictionary definition
     MOV X5, #0                  ; fixme: remove?
     LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
     AND W5, W5, F_IMMED
-debug1:
     CMP W5, #0
     B.NE 4f                     ; if IMMEDIATE, jump straight to executing
     B 2f
@@ -517,6 +517,7 @@ debug1:
     ;; not in the dictionary (not a word) so assume it's a literal number
     BL _NUMBER                  ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
     MOV W6, #1
+debug2:	
     CMP X1, #0
     B.GT 6f
     MOV X5, X0                  ; store number in X5
