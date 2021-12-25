@@ -29,6 +29,7 @@
   ;
 
 : ':' [ CHAR : ] LITERAL ;
+: ';' [ CHAR : ] LITERAL ;
 : '(' [ CHAR ( ] LITERAL ;
 : ')' [ CHAR ) ] LITERAL ;
 : '"' [ CHAR " ] LITERAL ;
@@ -199,6 +200,13 @@
   -1 0 = UNLESS '-' EMIT THEN \ should print '-'
    0 0 = UNLESS '0' EMIT THEN \ should not print
 ;
+
+\ Exercise: implement TIMES, which would execute a code block n number of times
+\ 10 TIMES <body END
+\ 
+
+
+
 
 \ FORTH allows ( ... ) as comments within function definitions.
 \ This works by having an IMMEDIATE word called ( which just drops
@@ -481,7 +489,7 @@
     DROP          ( drop the double quote character at the end )
     DUP           ( get the saved address of the length word )
     HERE @ SWAP - ( calculate the length )
-    8 -           ( subtract padding size (we measured from start of the length word) )
+    8 -           ( subtract padding size )
     SWAP !        ( and back-fill the length location )
     ALIGN         ( round up to next multiple of 16 bytes for the residual )
   ELSE            ( immediate mode )
@@ -536,19 +544,796 @@
 
 : TEST#6 ." ABC" CR ;
 : TEST#7 ." Hello world!" CR ;
-TEST#6
-TEST#7
-." Testing immediate mode" CR
+\ TEST#6
+\ TEST#7
 
+( -------------------- CONSTANTS AND VARIABLES --------------------
 
+ In FORTH, global constants and variables are defined like this:
 
+ 10 CONSTANT TEN  when TEN executes it leaves the integer 10 on the stack
+ VARIABLE VAR     when VAR executes it leaves the address of VAR on the stack
 
-\ 10 CONSTANT TEN   defines a constant TEN which leaves 10 on the stack )
+ Constants can be read but not written, eg:
+
+ TEN . CR         prints 10
+
+ You can read a variable (in this example called VAR) by doing:
+
+ VAR @            leaves the value of VAR on the stack
+ VAR @ . CR       prints the value of VAR
+ VAR ? CR         same as above, since ? is the same as @ .
+
+ and update the variable by doing:
+
+ 20 VAR !         sets VAR to 20
+
+ Note that variables are uninitialised (but see VALUE later on which
+ provides initialised variables with a slightly simpler syntax).
+
+ How can we define the words CONSTANT and VARIABLE?
+
+ The trick is to define a new word for the variable itself (eg. if the
+ variable was called 'VAR' then we would define a new word called VAR).
+ This is easy to do because we exposed dictionary entry creation through
+ the CREATE word (part of the definition of : above). A call to
+ WORD [TEN] CREATE (where [TEN] means that "TEN" is the next word in the input)
+ leaves the dictionary entry:
+
+				   +--- HERE
+				   |
+				   V
+	+---------+---+---+---+---+
+	| LINK    | 3 | T | E | N |
+	+---------+---+---+---+---+
+                   len
+
+ For CONSTANT we can continue by appending DOCOL (the codeword), then LIT
+ followed by the constant itself and then EXIT, forming a little word
+ definition that returns the constant:
+
+ +-------+---+---+---+---+------------+------------+------------+----------+
+ | LINK  | 3 | T | E | N | DOCOL      | LIT        | 10         | EXIT     |
+ +-------+---+---+---+---+------------+------------+------------+----------+
+                   len              codeword
+
+ Notice that this word definition is exactly the same as you would have got
+ if you had written : TEN 10 ;
+
+ Note for people reading the code below: DOCOL is a constant word which we
+ defined in the assembler part which returns the value of the assembler
+ symbol of the same name.
+
+)
+
 : CONSTANT
-  WORD         
-  CREATE       
-  DOCOL ,      
-  ' LIT ,      
-  ,            
-  ' EXIT ,     
+  WORD            ( get the name that follows CONSTANT )          
+  CREATE       	  ( make the dictionary entry )
+  DOCOL ,         ( append DOCOL, the codeword field of this word )
+  ' LIT ,         ( append the codeword LIT )
+  ,               ( append the value on top of the stack )
+  ' EXIT ,        ( append the codeword EXIT )
 ;
+
+9 CONSTANT 9times
+
+: TEST#8
+  9times
+  BEGIN
+    DUP 0> IF
+      ." This message will be repeated "
+      DUP . ." times" CR
+      1-
+    ELSE
+      DROP
+      EXIT
+    THEN
+  AGAIN
+;
+
+\ TEST#8
+
+(
+ VARIABLE is a little bit harder because we need somewhere to put the
+ variable.  There is nothing particularly special about the user memory
+ (the area of memory pointed to by HERE where we have previously just
+ stored new word definitions).  We can slice off bits of this memory area
+ to store anything we want, so one possible definition of VARIABLE might
+ create this:
+
+	   ,----------------------------------------------.
+	   |					          |
+	   V					          |
+	+-------+------+---+---+---+---+--------+-----+---|--------+------+
+	| <var> | LINK | 3 | V | A | R | DOCOL  | LIT | <addr var> | EXIT |
+	+-------+------+---+---+---+---+--------+-----+------------+------+
+        		len             codeword
+
+ where <var> is the place to store the variable, and <addr var> points
+ back to it.
+
+ To make this more general let's define a couple of words which we can use
+ to allocate arbitrary memory from the user memory.
+
+ First ALLOT, where n ALLOT allocates n bytes of memory.  (Note when calling
+ this that it's a very good idea to make sure that n is a multiple of 8, or
+ at least that next time a word is compiled that HERE has been left as a
+ multiple of 8).
+)
+
+: ALLOT          ( n -- addr )
+  HERE @ SWAP	 ( here n )
+  HERE +!        ( adds n to HERE )
+                 ( after this the old value of HERE is still on the stack )
+;
+
+(
+ Second, CELLS.  In FORTH the phrase 'n CELLS ALLOT' means allocate n
+ integers of whatever size is the natural size for integers on this machine
+ architecture.  On this 64 bit machine therefore CELLS just multiplies the
+ top of stack by 8.
+)
+
+: CELLS ( n -- n ) 8 * ;
+
+(
+ So now we can define VARIABLE easily in much the same way as CONSTANT above.
+ Refer to the diagram above to see what the word that this creates will look
+ like.
+)
+
+: VARIABLE
+  1 CELLS ALLOT	( allocate 1 cell of memory, push the pointer to this memory )
+  WORD CREATE	( make the dictionary entry (the name follows VARIABLE) )
+  DOCOL ,       ( append DOCOL (the codeword field of this word) )
+  ' LIT ,       ( append the codeword LIT )
+  ,		( append the pointer to the new memory )
+  ' EXIT ,	( append the codeword EXIT )
+;
+
+VARIABLE X
+: TEST#9
+  X @ .
+  42 X !
+  X @ .
+;
+\ TEST#9
+
+( ---------------------------- VALUES ---------------------------- 
+
+ VALUEs are like VARIABLEs but with a simpler syntax.  You would generally
+ use them when you want a variable which is read often, and written
+ infrequently.
+
+	20 VALUE VAL 	creates VAL with initial value 20
+	VAL		pushes the value (20) directly on the stack
+	30 TO VAL	updates VAL, setting it to 30
+	VAL		pushes the value (30) directly on the stack
+
+ Notice that 'VAL' on its own doesn't return the address of the value, but
+ the value itself, making values simpler and more obvious to use than
+ variables (no indirection through '@').
+
+ The price is a more complicated implementation, although despite the
+ complexity there is no performance penalty at runtime.
+
+ A naive implementation of 'TO' would be quite slow, involving a dictionary
+ search each time. But because this is FORTH we have complete control of the
+ compiler so we can compile TO more efficiently, turning:
+
+		TO VAL
+ into:
+		LIT <addr> !
+
+ and calculating <addr> (the address of the value) at compile time.
+
+ Now this is the clever bit.  We'll compile our value like this:
+
+	+------+---+---+---+---+----------+------+---------+--------+
+	| LINK | 3 | V | A | L | DOCOL    | LIT  | <value> | EXIT   |
+	+------+---+---+---+---+----------+------+---------+--------+
+                len              codeword
+
+ where <value> is the actual value itself.  Note that when VAL
+ executes, it will push the value on the stack, which is what we want.
+
+ But what will TO use for the address <addr>?
+ Why of course a pointer to that <value>:
+
+  code compiled - - - --+------------+------------+-----+-- - -
+  by TO VAL             | LIT        | <addr>     |  !  |
+                - - - --+------------+-----|------+-----+-- - -
+                                           |
+                                           V
+    +------+---+---+---+---+--------+-----+---------+------+
+    | LINK | 3 | V | A | L | DOCOL  | LIT | <value> | EXIT |
+    +------+---+---+---+---+--------+-----+---------+------+
+               len          codeword
+
+ In other words, this is a kind of self-modifying code.
+
+ Note #1: to the people who want to modify this FORTH to add inlining:
+ values defined this way cannot be inlined
+
+ Note #2: values can't be defined inside word definitions
+)
+
+( <value> VALUE <value-name>  creates <value-name> with initial <value> )
+: VALUE		( n -- )
+  WORD CREATE	( make the dictionary entry (the name follows VALUE) )
+  DOCOL ,       ( append DOCOL )
+  ' LIT ,       ( append the codeword LIT )
+  ,		( append the initial value )
+  ' EXIT ,	( append the codeword EXIT )
+;
+
+( <value> TO <value-name> stores <value> in <value-name> )
+: TO IMMEDIATE	( n -- )
+  WORD          ( get the name of the value )
+  FIND          ( look it up in the dictionary )
+  >DFA		( get a pointer to the first data field (the 'LIT') )
+  8 +		( increment to point at the value )
+  STATE @ IF	( compiling? )
+    ' LIT ,     ( compile LIT )
+    ,		( compile the address of the value )
+    ' ! ,       ( compile ! )
+  ELSE		( immediate mode )
+    !		( update it straightaway )
+  THEN
+;
+
+( <value> +TO <value-name>  adds <value> to <value-name> )
+: +TO IMMEDIATE
+  WORD          ( get the name of the value )
+  FIND		( look it up in the dictionary )
+  >DFA		( get a pointer to the first data field (the 'LIT') )
+  8 +		( increment to point at the value )
+  STATE @ IF	( compiling? )
+    ' LIT ,	( compile LIT )
+    ,		( compile the address of the value )
+    ' +! ,	( compile +! )
+  ELSE		( immediate mode )
+    +!		( update it straightaway )
+  THEN
+;
+
+0 VALUE XY
+
+: TEST#10
+  XY .
+  42 TO XY
+  XY .
+  1 +TO XY
+  XY .
+;
+\TEST#10
+
+( -------------------- PRINTING THE DICTIONARY --------------------
+
+ ID. takes an address of a dictionary entry and prints the word's name.
+ For example: LATEST @ ID. would print the name of the last word that was
+ defined.
+)
+: ID.
+  8 +		( skip over the link pointer )
+  DUP C@        ( get the flags/length byte )
+  F_LENMASK AND	( mask out the flags - just want the length )
+ 
+  BEGIN
+    DUP 0>      ( length > 0? )
+  WHILE
+    SWAP 1+     ( addr len -- len addr+1 )
+    DUP C@      ( len addr -- len addr char | get the next character)
+    EMIT        ( len addr char -- len addr | and print it)
+    SWAP 1-     ( len addr -- addr len-1    | subtract one from length )
+ REPEAT
+ 2DROP		( len addr -- )
+;
+
+: TEST#-11
+  WORD          ( get the name of the value )
+  FIND		( look it up in the dictionary )
+  ID.
+;
+\ TEST#-11 DUP
+
+( WORD word FIND ?HIDDEN  returns true if 'word' is flagged as hidden. )
+: ?HIDDEN
+  8 +		( skip over the link pointer )
+  C@		( get the flags/length byte )
+  F_HIDDEN AND	( mask the F_HIDDEN flag and return it (as a truth value) )
+;
+
+( WORD word FIND ?IMMEDIATE  returns true if 'word' is flagged as immediate. )
+: ?IMMEDIATE
+  8 +		( skip over the link pointer )
+  C@		( get the flags/length byte )
+  F_IMMED AND	( mask the F_IMMED flag and return it (as a truth value) )
+;
+
+( WORDS prints all the words defined in the dictionary, starting with the
+  word defined most recently. However it doesn't print hidden words.
+  The implementation simply iterates backwards from LATEST using the link
+  pointers. )
+
+: WORDS
+  LATEST @	        ( start at LATEST dictionary entry )
+  BEGIN
+    ?DUP		( while link pointer is not null )
+  WHILE
+    DUP ?HIDDEN NOT IF	( ignore hidden words )
+      DUP ID.		( but if not hidden, print the word )
+      SPACE
+    THEN
+    @		        ( dereference the link pointer - go to previous word )
+  REPEAT
+  CR
+;
+
+
+( ---------- FORGET ---------- 
+
+ So far we have only allocated words and memory.  FORTH provides a rather
+ primitive method to deallocate.
+
+ 'FORGET word' deletes the definition of 'word' from the dictionary and
+ everything defined after it, including any variables and other memory
+ allocated after.
+
+ The implementation is very simple - we look up the word (which returns the
+ dictionary entry address).  Then we set HERE to point to that address, so in
+ effect all future allocations and definitions will overwrite memory starting
+ at the word.  We also need to set LATEST to point to the previous word.
+
+ Note that you cannot FORGET built-in words (well, you can try but it will
+ probably cause a segfault).
+
+ XXX: Because we wrote VARIABLE to store the variable in memory allocated
+ before the word, in the current implementation VARIABLE FOO FORGET FOO will
+ leak 1 cell of memory.
+)
+
+: FORGET
+  WORD FIND		( find the word, gets the dictionary entry address )
+  DUP @ LATEST !	( set LATEST to point to the previous word )
+  HERE !		( and store HERE with the dictionary address )
+;
+
+( -------------------- DUMP --------------------
+
+  DUMP is used to dump out the contents of memory, in the 'traditional'
+  hexdump format.
+
+  Notice that the parameters to DUMP (address, length) are compatible
+  with string words such as WORD and S".
+
+  You can dump out the raw code for the last word you defined by doing
+  something like:
+
+		LATEST @ 128 DUMP
+)
+
+: DUMP			( addr len -- )
+  BASE @ -ROT		( save the current BASE at the bottom of the stack )
+  HEX  	 		( and switch to hexadecimal mode )
+  BEGIN
+    ?DUP		( while len > 0 )
+  WHILE
+    OVER 8 U.R		( print the address )
+    SPACE
+
+    ( print up to 16 words on this line )
+    2DUP		( addr len addr len )
+    1- 15 AND 1+	( addr len addr linelen )
+    BEGIN
+      ?DUP		( while linelen > 0 )
+    WHILE
+      SWAP		( addr len linelen addr )
+      DUP C@		( addr len linelen addr byte )
+      2 .R SPACE	( print the byte )
+      1+ SWAP 1-	( addr len linelen addr -- addr len addr+1 linelen-1 )
+    REPEAT
+    DROP		( addr len )
+
+    ( print the ASCII equivalents )
+    2DUP 1- 15 AND 1+   ( addr len addr linelen )
+    BEGIN
+      ?DUP		( while linelen > 0)
+    WHILE
+      SWAP		( addr len linelen addr )
+      DUP C@		( addr len linelen addr byte )
+      DUP 32 128 WITHIN IF	( 32 <= c < 128? )
+        EMIT
+      ELSE
+        DROP '.' EMIT
+      THEN
+      1+ SWAP 1-	( addr len linelen addr -- addr len addr+1 linelen-1 )
+    REPEAT
+    DROP		( addr len )
+    CR
+
+    DUP 1- 15 AND 1+    ( addr len linelen )
+    TUCK		( addr linelen len linelen )
+    -		        ( addr linelen len-linelen )
+    >R + R>		( addr+linelen len-linelen )
+  REPEAT
+
+  DROP			( restore stack )
+  BASE !		( restore saved BASE )
+;
+
+( -------------------- CASE -------------------- 
+
+  CASE...ENDCASE is how we do switch statements in FORTH.  There is no
+  generally agreed syntax for this, so I've gone for the syntax
+  mandated by the ISO standard FORTH (ANS-FORTH).
+
+		( some value on the stack )
+		CASE
+		test1 OF ... ENDOF
+		test2 OF ... ENDOF
+		testn OF ... ENDOF
+		... ( default case )
+		ENDCASE
+
+  The CASE statement tests the value on the stack by comparing it for
+  equality with test1, test2, ..., testn and executes the matching
+  piece of code within OF ... ENDOF.  If none of the test values match
+  then the default case is executed.  Inside the ... of the default
+  case, the value is still at the top of stack (it is implicitly
+  DROP-ed by ENDCASE).  When ENDOF is executed it jumps after ENDCASE
+  (ie. there is no "fall-through" and no need for a break statement
+  like in C).
+
+  The default case may be omitted.  In fact the tests may also be
+  omitted so that you just have a default case, although this is
+  probably not very useful.
+
+  An example (assuming that 'q', etc. are words which push the ASCII
+  value of the letter on the stack):
+
+      0 VALUE QUIT
+      0 VALUE SLEEP
+      KEY CASE
+          'q' OF 1 TO QUIT ENDOF
+          's' OF 1 TO SLEEP ENDOF
+          ( default case: )
+          ." Sorry, I didn't understand key <" DUP EMIT ." >, try again." CR
+      ENDCASE
+
+  (In some versions of FORTH, more advanced tests are supported, such
+  as ranges, etc.  Other versions of FORTH need you to write OTHERWISE
+  to indicate the default case.  As I said above, this FORTH tries to
+  follow the ANS FORTH standard).
+
+  The implementation of CASE...ENDCASE is somewhat non-trivial.  I'm
+  following the implementations from here:
+  
+  http://www.uni-giessen.de/faq/archiv/forthfaq.case_endcase/msg00000.html
+
+  The general plan is to compile the code as a series of IF statements:
+
+	CASE			(push 0 on the immediate-mode parameter stack)
+	test1 OF ... ENDOF	test1 OVER = IF DROP ... ELSE
+	test2 OF ... ENDOF	test2 OVER = IF DROP ... ELSE
+	testn OF ... ENDOF	testn OVER = IF DROP ... ELSE
+	... ( default case )	...
+	ENDCASE			DROP THEN [THEN [THEN ...]]
+
+  The CASE statement pushes 0 on the immediate-mode parameter stack,
+  and that number is used to count how many THEN statements we need
+  when we get to ENDCASE so that each IF has a matching THEN.  The
+  counting is done implicitly.  If you recall from the implementation
+  above of IF, each IF pushes a code address on the immediate-mode
+  stack, and these addresses are non-zero, so by the time we get to
+  ENDCASE the stack contains some number of non-zeroes, followed by a
+  zero.  The number of non-zeroes is how many times IF has been
+  called, so how many times we need to match it with THEN.
+
+ This code uses [COMPILE] so that we compile calls to IF, ELSE, THEN
+ instead of actually calling them while we're compiling the words
+ below.
+
+ As is the case with all of our control structures, they only work
+ within word definitions, not in immediate mode.
+)
+
+: CASE IMMEDIATE
+  0			( push 0 to mark the bottom of the stack )
+;
+
+: OF IMMEDIATE
+  ' OVER ,		( compile OVER )
+  ' = ,			( compile = )
+  [COMPILE] IF		( compile IF )
+  ' DROP ,  		( compile DROP )
+;
+
+: ENDOF IMMEDIATE
+  [COMPILE] ELSE	( ENDOF is the same as ELSE )
+;
+
+: ENDCASE IMMEDIATE
+  ' DROP ,		( compile DROP )
+
+  ( keep compiling THEN until we get to our zero marker )
+  BEGIN
+    ?DUP
+  WHILE
+    [COMPILE] THEN
+  REPEAT
+;
+
+: TEST#-12   ( n -- )
+  CASE
+  0 OF ." It was zero!" CR ENDOF
+  1 OF ." It was one!"  CR ENDOF
+  2 OF ." It was two!"  CR ENDOF
+  ." It wasn't zero, one or two " CR
+  ENDCASE
+;
+
+: TEST#-13
+  0 TEST#-12
+  1 TEST#-12
+  2 TEST#-12
+  3 TEST#-12
+;
+
+( -------------------- DECOMPILER --------------------
+
+  CFA> is the opposite of >CFA.  It takes a codeword and tries to find
+  the matching dictionary definition.  (In truth, it works with any
+  pointer into a word, not just the codeword pointer, and this is
+  needed to do stack traces).
+
+  In this FORTH this is not so easy.  In fact we have to search
+  through the dictionary because we don't have a convenient
+  back-pointer (as is often the case in other versions of FORTH).
+  Because of this search, CFA> should not be used when performance is
+  critical, so it is only used for debugging tools such as the
+  decompiler and printing stack traces.
+
+  This word returns 0 if it doesn't find a match.
+)
+: CFA>
+  LATEST @	( start at LATEST dictionary entry )
+  BEGIN
+    ?DUP		( while link pointer is not null )
+  WHILE
+    2DUP SWAP	( cfa curr curr cfa )
+    < IF		( current dictionary entry < cfa? )
+      NIP		( leave curr dictionary entry on the stack )
+      EXIT
+    THEN
+    @		( follow link pointer back )
+  REPEAT
+  DROP		( restore stack )
+  0		( sorry, nothing found )
+;
+
+( SEE decompiles a FORTH word.
+
+  We search for the dictionary entry of the word, then search again
+  for the next word (effectively, the end of the compiled word).
+  This results in two pointers:
+
+        +------+---+---+---+---+-------+--------+----+--------+
+        | LINK | 3 | T | E | N | DOCOL | LIT    | 10 | EXIT   |
+        +------+---+---+---+---+-------+--------+----+--------+
+         ^                                                     ^
+         |                                                     |
+        Start of word                                 End of word
+
+  With this information we can have a go at decompiling the word.  We
+  need to recognise "meta-words" like LIT, LITSTRING, BRANCH, etc. and
+  treat those separately.
+
+)
+: SEE
+  WORD FIND	( find the dictionary entry to decompile )
+
+  ( Now we search again, looking for the next word in the dictionary.
+    This gives us the length of the word that we will be decompiling.
+    (Well, mostly it does). )
+
+  HERE @	( address of the end of the last compiled word )
+  LATEST @	( word last curr )
+  BEGIN
+    2 PICK	( word last curr word )
+    OVER	( word last curr word curr )
+    <>		( word last curr word<>curr? )
+  WHILE		( word last curr )
+    NIP		( word curr )
+    DUP @	( word curr prev (which becomes: word last curr) )
+  REPEAT
+
+  DROP		( at this point, the stack is: start-of-word end-of-word )
+  SWAP		( end-of-word start-of-word )
+
+  ( begin the definition with : NAME [IMMEDIATE] )
+  ':' EMIT SPACE DUP ID. SPACE
+  DUP ?IMMEDIATE IF ." IMMEDIATE " THEN
+
+  ( get the data address, ie. points after DOCOL | end-of-word start-of-data )
+  >DFA	
+
+  ( now we start decompiling until we hit the end of the word )
+  BEGIN		 	( end start )
+    2DUP >
+  WHILE
+    DUP @		( end start codeword )
+ 
+    CASE
+    ' LIT OF		( is it LIT ? )
+      8 + DUP @	     	( get next word which is the integer constant )
+      .		        ( and print it )
+    ENDOF
+    ' LITSTRING OF	( is it LITSTRING ? )
+      [ CHAR S ] LITERAL EMIT '"' EMIT SPACE ( print S"<space> )
+      8 + DUP @		( get the length word )
+      SWAP 8 + SWAP	( end start+8 length )
+      2DUP TELL		( print the string )
+      '"' EMIT SPACE	( finish the string with a final quote )
+      + ALIGNED		( end start+4+len, aligned )
+      8 -		( because we're about to add 4 below )
+    ENDOF
+    ' 0BRANCH OF	( is it 0BRANCH ? )
+      ." 0BRANCH ( "
+      8 + DUP @		( print the offset )
+      .
+      ." ) "
+    ENDOF
+    ' BRANCH OF		( is it BRANCH ? )
+      ." BRANCH ( "
+      8 + DUP @		( print the offset )
+      .
+      ." ) "
+     ENDOF
+     ' ' OF		( is it ' (TICK) ? )
+       [ CHAR ' ] LITERAL EMIT SPACE
+       8 + DUP @	( get the next codeword )
+       CFA>		( and force it to be printed as a dictionary entry )
+       ID. SPACE
+     ENDOF
+     ' EXIT OF		( is it EXIT? )
+
+     ( We expect the last word to be EXIT, and if it is then we don't print
+       it because EXIT is normally implied by ;.  EXIT can also appear in
+       the middle of words, and then it needs to be printed. )
+
+       2DUP	  ( end start end start )
+       8 +	  ( end start end start+4 )
+       <> IF	  ( end start | we're not at the end )
+         ." EXIT "
+       THEN
+     ENDOF
+		  ( default case: )
+       DUP	  ( in the default case we always need to DUP before using )
+       CFA>	  ( look up the codeword to get the dictionary entry )
+       ID. SPACE  ( and print it )
+     ENDCASE
+
+     8 +          ( end start+4 )
+  REPEAT
+
+  ';' EMIT CR
+
+  2DROP           ( restore stack )
+;
+
+( -------------------- EXECUTION TOKENS --------------------
+
+  Standard FORTH defines a concept called an 'execution token' (or
+  'xt') which is very similar to a function pointer in C.  We map the
+  execution token to a codeword address.
+
+        execution token of DOUBLE is the address of this codeword
+                                           |
+                                           V
+  +------+---+---+---+---+---+---+---+---+--------+-----+----+------+
+  | LINK | 6 | D | O | U | B | L | E | 0 | DOCOL  | DUP | +  | EXIT |
+  +------+---+---+---+---+---+---+---+---+--------+-----+----+------+
+          len                         pad codeword                   ^
+
+  There is one assembler primitive for execution tokens,
+
+      EXECUTE ( xt -- )
+
+  which runs them.
+
+  You can make an execution token for an existing word the long way
+  using >CFA, ie: WORD [foo] FIND >CFA will push the xt for foo onto
+  the stack where foo is the next word in input.  So a very slow way
+  to run DOUBLE might be:
+
+		: DOUBLE DUP + ;
+		: SLOW WORD FIND >CFA EXECUTE ;
+		5 SLOW DOUBLE . CR	\ prints 10
+
+  We also offer a simpler and faster way to get the execution token of
+  any word FOO:
+
+		['] FOO
+
+  Exercises for readers:
+  (1) What is the difference between ['] FOO and ' FOO?
+  (2) What is the relationship between ', ['] and LIT?
+
+  More useful is to define anonymous words and/or to assign xt's to variables.
+
+  To define an anonymous word (and push its xt on the stack) use
+
+      :NONAME ... ;
+
+  as in this example:
+
+      :NONAME ." anon word was called" CR ;	\ pushes xt on the stack
+      DUP EXECUTE EXECUTE			\ executes the anon word twice
+
+  Stack parameters work as expected:
+
+      :NONAME ." called with parameter " . CR ;
+      DUP
+      10 SWAP EXECUTE		\ prints 'called with parameter 10'
+      20 SWAP EXECUTE		\ prints 'called with parameter 20'
+
+  Notice that the above code has a memory leak: the anonymous word is
+  still compiled into the data segment, so even if you lose track of
+  the xt, the word continues to occupy memory.  A good way to keep
+  track of the xt and thus avoid the memory leak is to assign it to a
+  CONSTANT, VARIABLE or VALUE:
+
+      0 VALUE ANON
+      :NONAME ." anon word was called" CR ; TO ANON
+      ANON EXECUTE
+      ANON EXECUTE
+
+  Another use of :NONAME is to create an array of functions which can
+  be called quickly (think: fast switch statement).  This example is
+  adapted from the ANS FORTH standard:
+
+      10 CELLS ALLOT CONSTANT CMD-TABLE
+      : SET-CMD CELLS CMD-TABLE + ! ;
+      : CALL-CMD CELLS CMD-TABLE + @ EXECUTE ;
+
+      :NONAME ." alternate 0 was called" CR ;	 0 SET-CMD
+      :NONAME ." alternate 1 was called" CR ;	 1 SET-CMD
+      \ etc...
+      :NONAME ." alternate 9 was called" CR ;	 9 SET-CMD
+ 
+      0 CALL-CMD
+      1 CALL-CMD
+)
+
+: :NONAME
+  0 0 CREATE	( create a word with no name - we need a dictionary
+                  header because ; expects it )
+  HERE @	( current HERE value is the address of the codeword,
+       		  ie. the xt )
+  DOCOL ,	( compile DOCOL (the codeword) )
+  ]		( go into compile mode )
+;
+
+: ['] IMMEDIATE
+  ' LIT ,		( compile LIT )
+;
+
+: TIMES			( n xt -- )
+  BEGIN
+    OVER 0>           
+  WHILE                 ( n addr -- )
+    2DUP 
+    EXECUTE
+    DROP
+    SWAP		( addr n -- )
+    1-			( addr n-1 -- )
+    SWAP		( n-1 addr -- )
+  REPEAT
+;
+
+: TEST#13
+ 10 ['] SPACE TIMES
+;
+
+TEST#13 42 EMIT CR

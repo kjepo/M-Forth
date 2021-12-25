@@ -81,7 +81,7 @@
   ;; It fetches and jumps to the next instruction.
 
   .macro  NEXT
-  LDR X0, [X8], #8
+  LDR X0, [X8], #8		; important that X0 points to codeword
   LDR X1, [X0]
   BLR     X1
   .endm
@@ -207,7 +207,7 @@ _KEY:
   .data
   .balign 8
 currkey:
-  .quad   buffer                ; Current place in input buffer (next character to read)
+  .quad   buffer   ; Current place in input buffer (next char to read)
 bufftop:
   .quad   buffer                ; Last valid data in input buffer + 1
 
@@ -446,7 +446,7 @@ _CREATE:
   STR     X3, [X4]  		; HERE = X3 = ready for body of this word
   RET
 
-  // X0 = code pointer to store
+  ;; X0 = code pointer to store
 _COMMA:                         ; store X3 in current dictionary definition
   KLOAD   X2, var_HERE
   LDR     X1, [X2]              ; X1 = HERE
@@ -495,7 +495,6 @@ _COMMA:                         ; store X3 in current dictionary definition
     ;; is the word in the dictionary?
     PUSH X1
     PUSH X2
-debug1:	
     BL _FIND                      ; { X4: header (0 if not found) }
     POP X1
     POP X0
@@ -517,7 +516,6 @@ debug1:
     ;; not in the dictionary (not a word) so assume it's a literal number
     BL _NUMBER                  ; { X0: number, X1 > 0 if error, X0: codeword, X4: header+8 }
     MOV W6, #1
-debug2:	
     CMP X1, #0
     B.GT 6f
     MOV X5, X0                  ; store number in X5

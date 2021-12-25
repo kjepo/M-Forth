@@ -63,7 +63,23 @@ prev = mkcode("-", "MINUS", ["POP X0", "POP X1", "SUB X0, X1, X0", "PUSH X0", "N
 prev = mkcode("*", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0", "NEXT"])
 prev = mkcode("1+", "INCR", ["POP X0", "ADD X0, X0, #1", "PUSH X0", "NEXT"])
 prev = mkcode("1-", "DECR", ["POP X0", "SUB X0, X0, #1", "PUSH X0", "NEXT"])
-prev = mkcode("DUP", "DUP", ["POP X0", "PUSH X0", "PUSH X0", "NEXT"])
+
+prev = mkcode("DUP", "DUP", [
+    "POP X0",
+    "PUSH X0",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("2DUP", "TWODUP", [  # ( a b -- a b a b )
+    "POP X0",
+    "POP X1",
+    "PUSH X1",
+    "PUSH X0",
+    "PUSH X1",
+    "PUSH X0",
+    "NEXT"
+])
 
 prev = mkcode("?DUP", "QDUP", [  # duplicate top of stack if non-zero
     "POP X0",
@@ -103,6 +119,12 @@ prev = mkcode("OVER", "OVER", ["POP X0", "POP X1", "PUSH X1", "PUSH X0", "PUSH X
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "NEXT"])
 prev = mkcode(".8", "DOT8", ["POP X0", "BL printhex8", "NEXT"])
 prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
+
+# Access to the return stack
+
+prev = mkcode(">R", "TOR", ["POP X0", "PUSHRSP X0", "NEXT"])
+prev = mkcode("R>", "FROMR", ["POPRSP X0", "PUSH X0", "NEXT"])
+
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
 prev = mkcode("DSP@", "DSPFETCH", ["MOV X0, SP", "PUSH X0", "NEXT"])
@@ -243,11 +265,20 @@ prev = mkcode("@", "FETCH", [       # ( addr -- n ) get contents at addr
     "PUSH X0",
     "NEXT"])
 
-prev = mkcode("!", "STORE", [
+prev = mkcode("!", "STORE", [   # ( n addr -- )  *addr = n
     "POP X0",                   # address to store at
     "POP X1",                   # data to store there
     "STR X1, [X0]",             # store it
     "NEXT" ])
+
+prev = mkcode("C@", "FETCHBYTE", [
+    "POP  X0",                  # address to store at
+    "MOV  X1, #0",
+    "LDRB W1, [X0]",            # fetch byte
+    "PUSH X1",
+    "NEXT"
+])
+
 
 prev = mkcode("C!", "STOREBYTE", [
     "POP X0",                   # address to store at
@@ -265,11 +296,10 @@ prev = mkcode("+!", "ADDSTORE", [
     "NEXT"
 ])
 
-
-
-prev = mkcode("FIND", "FIND", [     # ( addr length -- addr ) get dictionary entry for string
-    "POP  X2",                      # X1 = length
-    "POP  X1",                      # X0 = addr
+# ( addr length -- addr ) get dictionary entry for string
+prev = mkcode("FIND", "FIND", [     
+    "POP  X2",                      # X2 = length
+    "POP  X1",                      # X1 = addr
     "BL   _FIND",
     "PUSH X4",
     "NEXT"])
@@ -404,11 +434,12 @@ prev = mkcode("CHAR", "CHAR", [
 # after xt runs, its NEXT will continue executing the current word
 prev = mkcode("EXECUTE", "EXECUTE", [
     "POP  X0",                  # X0 = execution token
+    "LDR  X1, [X0]",            # important that X0 points to codeword
     "BLR  X1"                   # jump to it
 ])
 
-prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
-prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
+# prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
+# prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
 
 prev = mkword(":", "COLON", [ 	    # start word definition
@@ -438,6 +469,9 @@ prev = mkword("QUIT", "QUIT", [
 prev = mkconstaddr("DOCOL", "__DOCOL", "DOCOL")
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
+prev = mkconstint("F_HIDDEN", "__F_HIDDEN", "F_HIDDEN")
+prev = mkconstint("F_IMMED", "__F_IMMED", "F_IMMED")
+prev = mkconstint("F_LENMASK", "__F_LENMASK", "F_LENMASK")
 
 prev = mkvar("STATE", "STATE")
 prev = mkvar("HERE", "HERE")
