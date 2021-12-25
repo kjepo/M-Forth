@@ -1319,7 +1319,8 @@ VARIABLE X
   ' LIT ,		( compile LIT )
 ;
 
-: TIMES			( n xt -- )
+: TIMES 
+  WORD FIND >CFA
   BEGIN
     OVER 0>           
   WHILE                 ( n addr -- )
@@ -1331,9 +1332,9 @@ VARIABLE X
     SWAP		( n-1 addr -- )
   REPEAT
 ;
+  
+10 TIMES SPACE
+42 EMIT
+CR
 
-: TEST#13
- 10 ['] SPACE TIMES
-;
 
-TEST#13 42 EMIT CR
