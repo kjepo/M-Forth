@@ -127,14 +127,14 @@ prev = mkcode("R>", "FROMR", ["POPRSP X0", "PUSH X0", "NEXT"])
 
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
+prev = mkcode("RDROP", "RDROP", ["POPRSP X0", "NEXT"])
+
 prev = mkcode("DSP@", "DSPFETCH", ["MOV X0, SP", "PUSH X0", "NEXT"])
 prev = mkcode("DSP!", "DSPSTORE", ["POP X0", "MOV X0, SP", "NEXT"])
 
 # special form: push next word as constant
 # Assembler considers labels beginning with L as locals, hence DOLIT instead of LIT
 prev = mkcode("LIT", "_LIT", ["LDR X0, [X8], #8", "PUSH X0", "NEXT"])
-
-prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 
 # ANS FORTH says that the comparison words should return -1 for TRUE and 0 for FALSE
 # Jones Forth uses the C programming convention 1 for TRUE and 0 for FALSE.
@@ -143,7 +143,7 @@ prev = mkcode("HALT", "HALT", ["BL _HALT", "NEXT"])
 
 # ( a b -- a ) top two words are equal?
 prev = mkcode("=", "EQU", [
-    "POP	X0",
+    "POP X0",
     "POP X1",
     "CMP X1, X0",
     "CSETM X0, EQ",
@@ -223,6 +223,14 @@ prev = mkcode("0>=", "ZGE", [   # top of stack >= 0?
     "NEXT"
 ])
 
+prev = mkcode("0<>", "ZNEQU", [   # top of stack not 0?
+    "POP X0",
+    "CMP X0, #0",
+    "CSETM X0, NE",
+    "PUSH X0",
+    "NEXT"
+])
+
 prev = mkcode("AND", "AND", [  
     "POP X0",
     "POP X1",
@@ -276,6 +284,19 @@ prev = mkcode("C@", "FETCHBYTE", [
     "MOV  X1, #0",
     "LDRB W1, [X0]",            # fetch byte
     "PUSH X1",
+    "NEXT"
+])
+
+# CMOVE is a block copy operation
+prev = mkcode("CMOVE", "CMOVE", [
+    "POP  X0",                   # length
+    "POP  X1",                   # destination address
+    "POP  X2",                   # source address
+    "1: CMP X0, #0",
+    "LDRB W3, [X2], #1",        # W3 = *X2++
+    "STRB W3, [X1], #1",        # *X1++ = W3
+    "SUBS X0, X0, #1",           # until length = 0
+    "B.GT 1b",
     "NEXT"
 ])
 
@@ -438,6 +459,28 @@ prev = mkcode("EXECUTE", "EXECUTE", [
     "BLR  X1"                   # jump to it
 ])
 
+prev = mkcode("SYSCALL1", "SYSCALL1", [
+    "POP X16",                  # system call number
+    "POP X0",                   # argument
+    "SVC 0",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("DATA_SEGMENT", "DATA_SEGMENT", [
+    "KLOAD X0, data_segment",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("DATA_SEGMENT_SIZE", "DATA_SEGMENT_SIZE", [
+    "MOV X0, #INITIAL_DATA_SEGMENT_SIZE",
+    "PUSH X0",
+    "NEXT"
+])
+
+
+
 # prev = mkword("DOUBLE", "DOUBLE", ["DUP", "PLUS"])
 # prev = mkword("QUADRUPLE", "QUADRUPLE", ["DOUBLE", "DOUBLE"])
 prev = mkword(">DFA", "TDFA", ["TCFA", "INCR8"])
@@ -466,16 +509,24 @@ prev = mkword("QUIT", "QUIT", [
     "BRANCH", "-16"             # ... and loop (indefinitely)
     ])
 
+
 prev = mkconstaddr("DOCOL", "__DOCOL", "DOCOL")
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
+prev = mkconstint("__WORDSIZE", "__WORDSIZE", "M_WORDSIZE")
+prev = mkconstint("__STACKITEMSIZE", "__STACKITEMSIZE", "M_STACKITEMSIZE")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
 prev = mkconstint("F_HIDDEN", "__F_HIDDEN", "F_HIDDEN")
 prev = mkconstint("F_IMMED", "__F_IMMED", "F_IMMED")
 prev = mkconstint("F_LENMASK", "__F_LENMASK", "F_LENMASK")
 
+prev = mkconstint("SYS_EXIT", "SYS_EXIT", "__NR_exit")
+
 prev = mkvar("STATE", "STATE")
 prev = mkvar("HERE", "HERE")
 prev = mkvar("S0", "SZ")
+prev = mkvar("UNIX_ARGC", "UNIX_ARGC")
+prev = mkvar("UNIX_ARGV", "UNIX_ARGV")
+prev = mkvar("UNIX_ENVP", "UNIX_ENVP")
 prev = mkvar("BASE", "BASE", 10)
 # substitute in the _last_ entry for name_RNDSEED below:
 prev = mkvar("LATEST", "_LATEST", "name_RNDSEED")

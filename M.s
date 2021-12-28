@@ -77,18 +77,44 @@
   #include "kload.s"
   #include <sys/syscall.h>
 
+  .set M_VERSION, 1
+  ;; the size of the return stack _will_ increase the executable
+  .set RETURN_STACK_SIZE, 1048576 // 65536 // 8192
+  .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024 ; 1 MB
+  .set BUFFER_SIZE,4096         ; input buffer
+	
+  ;; don't change the following constants unless porting to a new platform
+  .set M_WORDSIZE, 8		; this is a 64-bit FORTH
+  .set M_STACKITEMSIZE, 16	; PUSH/POP is 16 bytes (see pushpop.s)
+  .set M_WORDSIZE1, M_WORDSIZE-1 ; 1 less than WORDSIZE 
+  .set F_IMMED,0x80             ; three masks for the length field [*] below
+  .set F_HIDDEN,0x20
+  .set F_LENMASK,0x1f           ; length mask
+	
+  ;; system call numbers can be found in syscall.h if you have downloaded XCode, e.g.
+  ;; typically in /Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include/sys/syscall.h
+  .set __NR_exit, 1		; SYS_exit
+
   ;; NEXT is the heart of the inner interpreter.
   ;; It fetches and jumps to the next instruction.
 
   .macro  NEXT
-  LDR X0, [X8], #8		; important that X0 points to codeword
+  LDR X0, [X8], #M_WORDSIZE	; important that X0 points to codeword
   LDR X1, [X0]
   BLR     X1
   .endm
 
   .global _main                 ; Provide program starting address to linker
-  .balign 8                     ; MacOS (and see footnote on align further up)
+  .balign M_WORDSIZE            ; MacOS (and see footnote on align further up)
+	
+
 _main:
+  KLOAD X9, var_UNIX_ARGC
+  STR   X0, [X9]		; save argc
+  KLOAD X9, var_UNIX_ARGV
+  STR   X1, [X9]		; save argv
+  KLOAD X9, var_UNIX_ENVP
+  STR   X2, [X9]		; save envp
   MOV   X0, SP
   KLOAD X9, var_S0
   STR   X0, [X9]                ; let S0 = initial SP
@@ -103,33 +129,17 @@ _main:
 
 
   .text
-  .balign 8
+  .balign M_WORDSIZE
 
 DOCOL:
   PUSHRSP X8
-  ADD X8, X0, #8
+  ADD X8, X0, #M_WORDSIZE
   NEXT
 
   #include "printhex.s"
 
-  .set M_VERSION,1
-  ;; the size of the return stack _will_ increase the executable
-  .set RETURN_STACK_SIZE, 1048576 // 65536 // 8192
-  .set INITIAL_DATA_SEGMENT_SIZE, 1024*1024 ; 1 MB
-  .set BUFFER_SIZE,4096         ; input buffer
-  .set F_IMMED,0x80             ; three masks for the length field [*] below
-  .set F_HIDDEN,0x20
-  .set F_LENMASK,0x1f           ; length mask
-
-
-  .balign 8                      ; FIXME: Align to page size
-return_stack:
-  .space RETURN_STACK_SIZE      ; Allocate static memory for the return stack
-return_stack_top:
-  .quad 0                       ; FIXME: remove
-
   // This is used as a temporary input buffer when reading from files or the terminal
-  .balign 8
+  .balign M_WORDSIZE
 buffer:
   .space BUFFER_SIZE
 
@@ -205,7 +215,7 @@ _KEY:
   B       1b
 
   .data
-  .balign 8
+  .balign M_WORDSIZE
 currkey:
   .quad   buffer   ; Current place in input buffer (next char to read)
 bufftop:
@@ -395,7 +405,7 @@ _FIND:
   ADDS    X5, XZR, X4                ;
   B.EQ    3f                         ; end of dictionary
   MOV     X7, #0
-  LDRB    W7, [X5, #8]!              ; load length + flags
+  LDRB    W7, [X5, #M_WORDSIZE]!              ; load length + flags
   AND     W7, W7, F_HIDDEN|F_LENMASK ; W7 = name length
   CMP     W7, W2
   B.NE    1b
@@ -415,11 +425,11 @@ _FIND:
   ;; return the code field address in X0
 _TCFA:
   MOV     X1, #0
-  LDRB    W1, [X0, #8]!         ; skip link pointer and load length + flags
-  AND     W1, W1, F_LENMASK     ; strip the flags
-  ADD     X0, X0, X1            ; skip characters
-  ADD     X0, X0, #8            ; skip length & flags (1 byte) + 7 for align
-  AND     X0, X0, #~7           ; ... to make it 8-byte aligned
+  LDRB    W1, [X0, #M_WORDSIZE]!  ; skip link pointer and load length + flags
+  AND     W1, W1, F_LENMASK       ; strip the flags
+  ADD     X0, X0, X1              ; skip characters
+  ADD     X0, X0, #M_WORDSIZE     ; skip length & flags (1 byte) + 7 for align
+  AND     X0, X0, #~M_WORDSIZE1   ; ... to make it 8-byte aligned
   RET
 
   // X1: length
@@ -430,7 +440,7 @@ _CREATE:
   KLOAD   X3, var_HERE
   LDR     X3, [X3]              ; X3 = HERE = the word we are creating
   MOV     X5, X3                ; X5 = copy of original HERE
-  STR     X2, [X3], #8          ; *X3++ = LATEST
+  STR     X2, [X3], #M_WORDSIZE          ; *X3++ = LATEST
   MOV     X7, X3
   STRB    W1, [X3], #1          ; *X3++ = length
 1:
@@ -438,8 +448,8 @@ _CREATE:
   STRB    W2, [X3], #1
   SUBS    X1, X1, #1
   B.NE    1b
-  ADD     X3, X3, #7
-  AND     X3, X3, ~7
+  ADD     X3, X3, #M_WORDSIZE1
+  AND     X3, X3, ~M_WORDSIZE1
   KLOAD   X2, var_LATEST
   STR     X5, [X2]  		; LATEST = what we just defined
   KLOAD   X4, var_HERE
@@ -450,7 +460,7 @@ _CREATE:
 _COMMA:                         ; store X3 in current dictionary definition
   KLOAD   X2, var_HERE
   LDR     X1, [X2]              ; X1 = HERE
-  STR     X0, [X1], #8          ; *X1++ = X3
+  STR     X0, [X1], #M_WORDSIZE          ; *X1++ = X3
   STR     X1, [X2]              ; HERE = X1
   RET
 
@@ -506,7 +516,7 @@ _COMMA:                         ; store X3 in current dictionary definition
     MOV X0, X4                  ; { W6: literal flag, X0 = X4: header != 0 }
     BL _TCFA                    ; get codeword pointer into X0
     MOV X5, #0                  ; fixme: remove?
-    LDRB W5, [X4, #8]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
+    LDRB W5, [X4, #M_WORDSIZE]           ; { W6: literal flag, X0: codeword, X4: header+8, W5: length+flag }
     AND W5, W5, F_IMMED
     CMP W5, #0
     B.NE 4f                     ; if IMMEDIATE, jump straight to executing
@@ -618,12 +628,17 @@ urandom:
   .asciz "/dev/urandom"
 
   .data
-  .balign  8
+  .balign M_WORDSIZE
 COLDSTART:
   .quad QUIT
 
-
-  ;;  The BSS segment won't add to the binary's size
   .bss
+  .balign 4096
+return_stack:
+  .space RETURN_STACK_SIZE      ; Allocate static memory for the return stack
+return_stack_top:
+  .quad 0                       ; FIXME: remove
+	
+  ;;  The BSS segment won't add to the binary's size
 data_segment:
   .space INITIAL_DATA_SEGMENT_SIZE

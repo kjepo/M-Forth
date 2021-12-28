@@ -115,16 +115,48 @@ a pointer to a piece of code that handles the word.  What is meant by
 "handling" the word depends on the word being a primitive (written in assembler)
 or not (consisting of links to other words).
 
+# Deviations from Jones Forth
+
+- Jones relies heavily on macros <tt>defcode</tt>, <tt>defvar</tt>
+and <tt>defconst</tt> for defining primitives, variables and constants.
+The assembler I use does not let me re-define the variable <tt>link</tt>
+which is used to chain together all the words.  Instead I wrote a small
+Python script <tt>words.py</tt> which generates the necessary assembler
+definitions for all the primitives, variables and constants.
+The Makefile generates the file <tt>primitives.s</tt> which is then
+included in the main file <tt>M.s</tt>.
+
+- Rather than putting magic numbers like <tt>4</tt> and <tt>8</tt>
+in the code, I've decided to add two constants <tt>__WORDSIZE</tt>
+and <tt>__STACKITEMSIZE</tt>.  These are (as the names imply) the
+number of bytes in a word (8) and the size of a stack element (16).
+These are restrictions enforced by the ARM architecture, so leave
+them alone unless you are porting this to another platform.
+
+- As a result of the above, I have not implemented primitives <tt>4+</tt>
+and <tt>4-</tt>.  You should use <tt>__WORDSIZE +</tt> if you are
+messing around with the internal data structures.
+
+- M-FORTH checks for stack underflow on the data stack, and
+stack overflow on the return stack.  You can disable this with
+the <tt>STACKWARNING</tt> option in the <tt>Makefile</tt> but
+in my experience, checking for stack underflow/overflow doesn't
+take much time.  While it would be nice to check for data stack
+overflow and return stack underflow, this is unfortunately not
+implemented (yet).
+
+- I've decided to use <tt>-1</tt> for true and <tt>0</tt> for false,
+unlike Jones Forth but in sync with ANS FORTH. I think the reason
+for sticking to the ANS FORTH convention is that you can use <tt>AND</tt>,
+<tt>OR</tt>, etc both as boolean and bitwise logical operations.
+
+- Jones Forth relies on the brk(2) system call to figure out where
+the data segment starts and to request some initial space. In recent
+Mac OS X, brk has been discontinued so I use allocate space for
+the data segment with a constant <tt>INITIAL_DATA_SEGMENT_SIZE</tt>
+in the BSS segment. This does not seem to affect the size of the
+binary for M-FORTH.
+
 # Things to do (unsorted)
 
-- The word size should really be a constant (<tt>8 CONSTANT WORDSIZE</tt>)
-so that the code isn't littered with magic numbers like
-<tt>8</tt> or <tt>7</tt>, or even <tt>~7</tt>.
-In Jones Forth, the corresponding word size is <tt>4</tt> BTW.
-- Another "constant" is the alignment which is 8, i.e., every machine code
-subroutine needs to be aligned to the nearest multiple of 8.
-- Yet another constant is the size of stack elements: the ARM hardware
-requires that the stack pointer is 16-byte aligned.  We're actually
-wasting 8 bytes every time we <tt>PUSH</tt> to the data- or return stack.
-
-
+- Documentation

@@ -121,7 +121,7 @@
 : TEST#1
   10                \ start with 10
   BEGIN
-    DUP .           \ print it
+    DUP . CR        \ print it
     -1 +            \ subtract 1
     DUP 0 = UNTIL   \ until it's 0
 ;
@@ -141,7 +141,7 @@
 : TEST#3            \ Infinite loop of random numbers [0..10[
   RANDOMIZE
   BEGIN
-    RND 10 MOD .
+    RND 10 MOD . CR
   AGAIN
 ;
 
@@ -171,7 +171,7 @@
   BEGIN
     DUP 10 <>
   WHILE
-    DUP .
+    DUP . CR
     1 + 
   REPEAT
 ;
@@ -489,7 +489,7 @@
     DROP          ( drop the double quote character at the end )
     DUP           ( get the saved address of the length word )
     HERE @ SWAP - ( calculate the length )
-    8 -           ( subtract padding size )
+    __WORDSIZE -  ( subtract padding size )
     SWAP !        ( and back-fill the length location )
     ALIGN         ( round up to next multiple of 16 bytes for the residual )
   ELSE            ( immediate mode )
@@ -549,36 +549,36 @@
 
 ( -------------------- CONSTANTS AND VARIABLES --------------------
 
- In FORTH, global constants and variables are defined like this:
+  In FORTH, global constants and variables are defined like this:
 
- 10 CONSTANT TEN  when TEN executes it leaves the integer 10 on the stack
- VARIABLE VAR     when VAR executes it leaves the address of VAR on the stack
+  10 CONSTANT TEN  when TEN executes it leaves the integer 10 on the stack
+  VARIABLE VAR     when VAR executes it leaves the address of VAR on the stack
 
- Constants can be read but not written, eg:
+  Constants can be read but not written, eg:
 
- TEN . CR         prints 10
+  TEN . CR         prints 10
 
- You can read a variable (in this example called VAR) by doing:
+  You can read a variable (in this example called VAR) by doing:
 
- VAR @            leaves the value of VAR on the stack
- VAR @ . CR       prints the value of VAR
- VAR ? CR         same as above, since ? is the same as @ .
+  VAR @            leaves the value of VAR on the stack
+  VAR @ . CR       prints the value of VAR
+  VAR ? CR         same as above, since ? is the same as @ .
 
- and update the variable by doing:
+  and update the variable by doing:
 
- 20 VAR !         sets VAR to 20
+  20 VAR !         sets VAR to 20
 
- Note that variables are uninitialised (but see VALUE later on which
- provides initialised variables with a slightly simpler syntax).
+  Note that variables are uninitialised (but see VALUE later on which
+  provides initialised variables with a slightly simpler syntax).
 
- How can we define the words CONSTANT and VARIABLE?
+  How can we define the words CONSTANT and VARIABLE?
 
- The trick is to define a new word for the variable itself (eg. if the
- variable was called 'VAR' then we would define a new word called VAR).
- This is easy to do because we exposed dictionary entry creation through
- the CREATE word (part of the definition of : above). A call to
- WORD [TEN] CREATE (where [TEN] means that "TEN" is the next word in the input)
- leaves the dictionary entry:
+  The trick is to define a new word for the variable itself (eg. if the
+  variable was called 'VAR' then we would define a new word called VAR).
+  This is easy to do because we exposed dictionary entry creation through
+  the CREATE word (part of the definition of : above). A call to
+  WORD [TEN] CREATE (where [TEN] means that "TEN" is the next word in the
+  input) leaves the dictionary entry:
 
 				   +--- HERE
 				   |
@@ -588,22 +588,21 @@
 	+---------+---+---+---+---+
                    len
 
- For CONSTANT we can continue by appending DOCOL (the codeword), then LIT
- followed by the constant itself and then EXIT, forming a little word
- definition that returns the constant:
+  For CONSTANT we can continue by appending DOCOL (the codeword), then LIT
+  followed by the constant itself and then EXIT, forming a little word
+  definition that returns the constant:
 
- +-------+---+---+---+---+------------+------------+------------+----------+
- | LINK  | 3 | T | E | N | DOCOL      | LIT        | 10         | EXIT     |
- +-------+---+---+---+---+------------+------------+------------+----------+
-                   len              codeword
+  +-------+---+---+---+---+------------+------------+------------+----------+
+  | LINK  | 3 | T | E | N | DOCOL      | LIT        | 10         | EXIT     |
+  +-------+---+---+---+---+------------+------------+------------+----------+
+           len              codeword
 
- Notice that this word definition is exactly the same as you would have got
- if you had written : TEN 10 ;
+  Notice that this word definition is exactly the same as you would have got
+  if you had written : TEN 10 ;
 
- Note for people reading the code below: DOCOL is a constant word which we
- defined in the assembler part which returns the value of the assembler
- symbol of the same name.
-
+  Note for people reading the code below: DOCOL is a constant word which we
+  defined in the assembler part which returns the value of the assembler
+  symbol of the same name.
 )
 
 : CONSTANT
@@ -633,13 +632,12 @@
 
 \ TEST#8
 
-(
- VARIABLE is a little bit harder because we need somewhere to put the
- variable.  There is nothing particularly special about the user memory
- (the area of memory pointed to by HERE where we have previously just
- stored new word definitions).  We can slice off bits of this memory area
- to store anything we want, so one possible definition of VARIABLE might
- create this:
+( VARIABLE is a little bit harder because we need somewhere to put the
+  variable.  There is nothing particularly special about the user memory
+  (the area of memory pointed to by HERE where we have previously just
+  stored new word definitions).  We can slice off bits of this memory area
+  to store anything we want, so one possible definition of VARIABLE might
+  create this:
 
 	   ,----------------------------------------------.
 	   |					          |
@@ -649,16 +647,16 @@
 	+-------+------+---+---+---+---+--------+-----+------------+------+
         		len             codeword
 
- where <var> is the place to store the variable, and <addr var> points
- back to it.
+  where <var> is the place to store the variable, and <addr var> points
+  back to it.
 
- To make this more general let's define a couple of words which we can use
- to allocate arbitrary memory from the user memory.
+  To make this more general let's define a couple of words which we can use
+  to allocate arbitrary memory from the user memory.
 
- First ALLOT, where n ALLOT allocates n bytes of memory.  (Note when calling
- this that it's a very good idea to make sure that n is a multiple of 8, or
- at least that next time a word is compiled that HERE has been left as a
- multiple of 8).
+  First ALLOT, where n ALLOT allocates n bytes of memory.  (Note when calling
+  this that it's a very good idea to make sure that n is a multiple of
+  WORDSIZE, or at least that next time a word is compiled that HERE has been
+  left as a multiple of WORDSIZE).
 )
 
 : ALLOT          ( n -- addr )
@@ -667,14 +665,13 @@
                  ( after this the old value of HERE is still on the stack )
 ;
 
-(
- Second, CELLS.  In FORTH the phrase 'n CELLS ALLOT' means allocate n
- integers of whatever size is the natural size for integers on this machine
- architecture.  On this 64 bit machine therefore CELLS just multiplies the
- top of stack by 8.
+( Second, CELLS.  In FORTH the phrase 'n CELLS ALLOT' means allocate n
+  integers of whatever size is the natural size for integers on this machine
+  architecture.  On this 64 bit machine therefore CELLS just multiplies the
+  top of stack by WORDSIZE == 8.
 )
 
-: CELLS ( n -- n ) 8 * ;
+: CELLS ( n -- n ) __WORDSIZE * ;
 
 (
  So now we can define VARIABLE easily in much the same way as CONSTANT above.
@@ -772,7 +769,7 @@ VARIABLE X
   WORD          ( get the name of the value )
   FIND          ( look it up in the dictionary )
   >DFA		( get a pointer to the first data field (the 'LIT') )
-  8 +		( increment to point at the value )
+  __WORDSIZE +  ( increment to point at the value )
   STATE @ IF	( compiling? )
     ' LIT ,     ( compile LIT )
     ,		( compile the address of the value )
@@ -787,7 +784,7 @@ VARIABLE X
   WORD          ( get the name of the value )
   FIND		( look it up in the dictionary )
   >DFA		( get a pointer to the first data field (the 'LIT') )
-  8 +		( increment to point at the value )
+  __WORDSIZE +  ( increment to point at the value )
   STATE @ IF	( compiling? )
     ' LIT ,	( compile LIT )
     ,		( compile the address of the value )
@@ -815,7 +812,7 @@ VARIABLE X
  defined.
 )
 : ID.
-  8 +		( skip over the link pointer )
+  __WORDSIZE +	( skip over the link pointer )
   DUP C@        ( get the flags/length byte )
   F_LENMASK AND	( mask out the flags - just want the length )
  
@@ -839,14 +836,14 @@ VARIABLE X
 
 ( WORD word FIND ?HIDDEN  returns true if 'word' is flagged as hidden. )
 : ?HIDDEN
-  8 +		( skip over the link pointer )
+  __WORDSIZE +	( skip over the link pointer )
   C@		( get the flags/length byte )
   F_HIDDEN AND	( mask the F_HIDDEN flag and return it (as a truth value) )
 ;
 
 ( WORD word FIND ?IMMEDIATE  returns true if 'word' is flagged as immediate. )
 : ?IMMEDIATE
-  8 +		( skip over the link pointer )
+  __WORDSIZE +	( skip over the link pointer )
   C@		( get the flags/length byte )
   F_IMMED AND	( mask the F_IMMED flag and return it (as a truth value) )
 ;
@@ -1159,52 +1156,52 @@ VARIABLE X
   >DFA	
 
   ( now we start decompiling until we hit the end of the word )
-  BEGIN		 	( end start )
+  BEGIN		 	     	( end start )
     2DUP >
   WHILE
-    DUP @		( end start codeword )
+    DUP @			( end start codeword )
  
     CASE
-    ' LIT OF		( is it LIT ? )
-      8 + DUP @	     	( get next word which is the integer constant )
-      .		        ( and print it )
+    ' LIT OF			( is it LIT ? )
+      __WORDSIZE + DUP @ 	( get next word which is the integer constant )
+      .		        	( and print it )
     ENDOF
-    ' LITSTRING OF	( is it LITSTRING ? )
+    ' LITSTRING OF		( is it LITSTRING ? )
       [ CHAR S ] LITERAL EMIT '"' EMIT SPACE ( print S"<space> )
-      8 + DUP @		( get the length word )
-      SWAP 8 + SWAP	( end start+8 length )
-      2DUP TELL		( print the string )
-      '"' EMIT SPACE	( finish the string with a final quote )
-      + ALIGNED		( end start+4+len, aligned )
-      8 -		( because we're about to add 4 below )
+      __WORDSIZE + DUP @      	( get the length word )
+      SWAP __WORDSIZE + SWAP	( end start+WORDSIZE length )
+      2DUP TELL			( print the string )
+      '"' EMIT SPACE		( finish the string with a final quote )
+      + ALIGNED			( end start+4+len, aligned )
+      __WORDSIZE -		( because we're about to add 4 below )
     ENDOF
-    ' 0BRANCH OF	( is it 0BRANCH ? )
+    ' 0BRANCH OF		( is it 0BRANCH ? )
       ." 0BRANCH ( "
-      8 + DUP @		( print the offset )
+      __WORDSIZE + DUP @	( print the offset )
       .
       ." ) "
     ENDOF
     ' BRANCH OF		( is it BRANCH ? )
       ." BRANCH ( "
-      8 + DUP @		( print the offset )
+      __WORDSIZE + DUP @	( print the offset )
       .
       ." ) "
      ENDOF
-     ' ' OF		( is it ' (TICK) ? )
+     ' ' OF			( is it ' (TICK) ? )
        [ CHAR ' ] LITERAL EMIT SPACE
-       8 + DUP @	( get the next codeword )
-       CFA>		( and force it to be printed as a dictionary entry )
+       __WORDSIZE + DUP @	( get the next codeword )
+       CFA>		   ( and force it to be printed as a dictionary entry )
        ID. SPACE
      ENDOF
-     ' EXIT OF		( is it EXIT? )
+     ' EXIT OF			( is it EXIT? )
 
      ( We expect the last word to be EXIT, and if it is then we don't print
        it because EXIT is normally implied by ;.  EXIT can also appear in
        the middle of words, and then it needs to be printed. )
 
-       2DUP	  ( end start end start )
-       8 +	  ( end start end start+4 )
-       <> IF	  ( end start | we're not at the end )
+       2DUP	     	    	( end start end start )
+       __WORDSIZE +	  	( end start end start+4 )
+       <> IF	  		( end start | we're not at the end )
          ." EXIT "
        THEN
      ENDOF
@@ -1214,7 +1211,7 @@ VARIABLE X
        ID. SPACE  ( and print it )
      ENDCASE
 
-     8 +          ( end start+4 )
+     __WORDSIZE + ( end start+4 )
   REPEAT
 
   ';' EMIT CR
@@ -1319,22 +1316,415 @@ VARIABLE X
   ' LIT ,		( compile LIT )
 ;
 
+( Example: 10 TIMES SPACE  calls SPACE 10 times )
 : TIMES 
-  WORD FIND >CFA
+  WORD FIND >CFA	( get xt for next word )
   BEGIN
-    OVER 0>           
-  WHILE                 ( n addr -- )
-    2DUP 
-    EXECUTE
-    DROP
-    SWAP		( addr n -- )
-    1-			( addr n-1 -- )
-    SWAP		( n-1 addr -- )
+    OVER 0>             ( xt n )
+  WHILE                 ( n xt )
+    DUP 		( n xt xt )
+    EXECUTE		( n xt )
+    SWAP		( xt n  )
+    1-			( xt n-1 )
+    SWAP		( n-1 xt )
   REPEAT
 ;
   
-10 TIMES SPACE
-42 EMIT
-CR
+\ 10 TIMES SPACE 42 EMIT CR
+( Exercise: write   10 TIMES BEGIN ... END )
 
 
+
+( -------------------- EXCEPTIONS --------------------
+
+  Amazingly enough, exceptions can be implemented directly in FORTH,
+  in fact rather easily.
+
+  The general usage is as follows:
+
+      : FOO ( n -- ) THROW ;
+
+      : TEST-EXCEPTIONS
+        25 ['] FOO CATCH     \ execute 25 FOO, catching any exception
+        ?DUP IF
+          ." called FOO and it threw exception number: "
+          . CR
+          DROP		     \ we have to drop the argument of FOO (25)
+        THEN
+      ;
+      \ prints: called FOO and it threw exception number: 25
+
+  CATCH runs an execution token and detects whether it throws any
+  exception or not.  The stack signature of CATCH is rather complicated:
+
+  ( a_n-1 .. a_1 a_0 xt -- r_m-1 .. r_1 r_0 0 ) if xt didn't throw an exception
+  ( a_n-1 .. a_1 a_0 xt -- ?_n-1 .. ?_1 ?_0 e ) if xt DID throw exception 'e'
+
+  where a_i and r_i are the (arbitrary number of) argument and return stack
+  contents before and after xt is EXECUTEd.  Notice in particular the case
+  where an exception is thrown, the stack pointer is restored so that there
+  are n of _something_ on the stack in the positions where the arguments a_i
+  used to be.  We don't really guarantee what is on the stack -- perhaps the
+  original arguments, and perhaps other nonsense -- it largely depends on the
+  implementation of the word that was executed.
+
+  THROW, ABORT and a few others throw exceptions.
+
+  Exception numbers are non-zero integers.  By convention the positive numbers
+  can be used for app-specific exceptions and the negative numbers have
+  certain meanings defined in the ANS FORTH standard.  (For example, -1 is
+  the exception thrown by ABORT).
+
+  0 THROW does nothing.  This is the stack signature of THROW:
+
+  ( 0 -- )
+  ( * e -- ?_n-1 .. ?_1 ?_0 e ) the stack is restored to the state from the
+                                corresponding CATCH
+
+  The implementation hangs on the definitions of CATCH and THROW and the
+  state shared between them.
+
+  Up to this point, the return stack has consisted merely of a list of return
+  addresses, with the top of the return stack being the return address where
+  we will resume executing when the current word EXITs.  However CATCH will
+  push a more complicated 'exception stack frame' on the return stack.
+  The exception stack frame records some things about the state of execution
+  at the time that CATCH was called.
+
+  When called, THROW walks up the return stack (the process is called
+  'unwinding') until it finds the exception stack frame.  It then uses the
+  data in the exception stack frame to restore the state allowing execution to
+  continue after the matching CATCH.  (If it	unwinds the stack and doesn't
+  find the exception stack frame then it prints a message and drops back to the
+  prompt, which is also normal behaviour for so-called 'uncaught exceptions').
+
+  This is what the exception stack frame looks like.  (As is conventional,
+  the return stack is shown growing downwards from higher to lower memory
+  addresses).
+
+        +------------------------------+
+        | return address from CATCH    |   Notice this is already on the
+        |                              |   return stack when CATCH is called.
+        +------------------------------+
+        | original parameter stack     |
+        | pointer                      |
+        +------------------------------+  ^
+        | exception stack marker       |  |
+        | (EXCEPTION-MARKER)           |  |   Direction of stack
+        +------------------------------+  |   unwinding by THROW.
+                                          |
+                                          |
+
+  The EXCEPTION-MARKER marks the entry as being an exception stack frame
+  rather than an ordinary return address, and it is this which THROW "notices"
+  as it is unwinding the stack.  (If you want to implement more advanced
+  exceptions such as TRY...WITH then you'll need to use a different value of
+  marker if you want the old and new exception stack frame layouts to coexist).
+
+  What happens if the executed word doesn't throw an exception?  It will
+  eventually return and call EXCEPTION-MARKER, so EXCEPTION-MARKER had better
+  do something sensible without us needing to modify EXIT.  This nicely gives
+  us a suitable definition of EXCEPTION-MARKER, namely a function that just
+  drops the stack frame and itself returns (thus "returning" from the original
+  CATCH).
+
+  One thing to take from this is that exceptions are a relatively lightweight
+  mechanism in FORTH.
+)
+
+: EXCEPTION-MARKER
+  RDROP		( drop the original parameter stack pointer )
+  0		( there was no exception, this is the normal return path )
+;
+
+: CATCH		( xt -- exn? )
+  ( save parameter stack pointer (+16 because of xt) on return stack )
+  DSP@ __STACKITEMSIZE + >R	
+  ( push the address of the RDROP inside EXCEPTION-MARKER ... )
+  ' EXCEPTION-MARKER __STACKITEMSIZE +
+  ( ... on to the return stack so it acts like a return address )  
+  >R		
+  EXECUTE	( execute the nested function )
+;
+
+: THROW		( n -- )
+  ?DUP IF	( only act if the exception code <> 0 )
+    RSP@ 	( get return stack pointer )
+    BEGIN
+      DUP R0 __STACKITEMSIZE - <	( RSP < R0 )
+    WHILE
+      DUP @		( get the return stack entry )
+      ( found the EXCEPTION-MARKER on the return stack )
+      ' EXCEPTION-MARKER __STACKITEMSIZE + = IF	
+        __STACKITEMSIZE +	( skip the EXCEPTION-MARKER on the return stack )
+        RSP!	( restore the return stack pointer )
+
+        ( Restore the parameter stack. )
+        DUP DUP DUP
+        ( reserve some working space so the stack for this word
+        doesn't coincide with the part of the stack being restored )
+        R>	( get the saved parameter stack pointer | n dsp )
+        __STACKITEMSIZE -	( reserve space on the stack to store n )
+        SWAP OVER	( dsp n dsp )
+        !		( write n on the stack )
+        DSP! EXIT ( restore the parameter stack pointer, immediately exit )
+      THEN
+      __STACKITEMSIZE +
+    REPEAT
+
+    ( No matching catch - print a message and restart the INTERPRETer. )
+    DROP
+
+    CASE
+    0 1- OF	( ABORT )
+      ." ABORTED" CR
+    ENDOF
+      ( default case )
+      ." UNCAUGHT THROW "
+      DUP . CR
+    ENDCASE
+    QUIT
+  THEN
+;
+
+: ABORT		( -- )
+  0 1- THROW
+;
+
+( Print a stack trace by walking up the return stack. )
+: PRINT-STACK-TRACE
+  RSP@			( start at caller of this function )
+  BEGIN
+    DUP R0 __STACKITEMSIZE - <	( RSP < R0 )
+  WHILE
+    DUP @		( get the return stack entry )
+    CASE
+    ' EXCEPTION-MARKER __STACKITEMSIZE + OF	( is it the exception stack frame? )
+      ." CATCH ( DSP="
+      __STACKITEMSIZE + DUP @ U.	  ( print saved stack pointer )
+      ." ) "
+    ENDOF
+      ( default case )
+      DUP
+      CFA>		  ( look up the codeword to get the dictionary entry )
+      ?DUP IF		  ( and print it )
+        2DUP		  ( dea addr dea )
+        ID.		  ( print word from dictionary entry )
+        [ CHAR + ] LITERAL EMIT
+        SWAP >DFA __STACKITEMSIZE + - . ( print offset )
+      THEN
+    ENDCASE
+    __STACKITEMSIZE +			  ( move up the stack )
+  REPEAT
+  DROP
+  CR
+;
+
+: FOO ( n -- ) THROW ;
+
+: TEST-EXCEPTIONS
+ 25 ['] FOO CATCH	\ execute 25 FOO, catching any exception
+ ?DUP IF
+   ." called FOO and it threw exception number: "
+   . CR
+   DROP		\ we have to drop the argument of FOO (25)
+ THEN
+;
+
+\ TEST-EXCEPTIONS
+
+( -------------------- C STRINGS --------------------
+
+  FORTH strings are represented by a start address and length kept on
+  the stack or in memory.
+
+  Most FORTHs don't handle C strings, but we need them in order to
+  access the process arguments and environment left on the stack by
+  the Linux kernel, and to make some system calls.
+
+  Operation           Input     Output     FORTH word  Notes
+  ----------------------------------------------------------------------
+
+  Create FORTH string           addr len   S" ..."
+
+  Create C string               c-addr     Z" ..."
+
+  C -> FORTH          c-addr    addr len   DUP STRLEN
+
+  FORTH -> C          addr len  c-addr     CSTRING     Allocated in a
+  	   	      	   		   	       temporary buffer,
+						       so should be consumed
+						       or copied immediately.
+ 						       FORTH string should
+						       not contain NULs.
+
+  For example, DUP STRLEN TELL prints a C string.
+)
+
+( Z" .." is like S" ..." except that the string is terminated by an
+  ASCII NUL character.
+
+  To make it more like a C string, at runtime Z" just leaves the
+  address of the string on the stack (not address & length as with
+  S").  To implement this we need to add the extra NUL to the string
+  and also a DROP instruction afterwards.  Apart from that the
+  implementation just a modified S".
+)
+
+: Z" IMMEDIATE
+  STATE @ IF		( compiling? )
+    ' LITSTRING ,	( compile LITSTRING )
+    HERE @		( save the address of the length word on the stack )
+    0 ,			( dummy length - we don't know what it is yet )
+    BEGIN
+      KEY 		( get next character of the string )
+      DUP '"' <>
+    WHILE
+      HERE @ C!		( store the character in the compiled image )
+      1 HERE +!		( increment HERE pointer by 1 byte )
+    REPEAT
+    0 HERE @ C!		( add the ASCII NUL byte )
+    1 HERE +!
+    DROP		( drop the double quote character at the end )
+    DUP			( get the saved address of the length word )
+    HERE @ SWAP -	( calculate the length )
+    __WORDSIZE -	( subtract WORDSIZE ( because we measured 
+                          from the start of the length word) )
+    SWAP !		( and back-fill the length location )
+    ALIGN		( round up to next multiple for the remaining code )
+    ' DROP ,		( compile DROP (to drop the length) )
+  ELSE			( immediate mode )
+    HERE @		( get the start address of the temporary space )
+    BEGIN
+      KEY
+      DUP '"' <>
+    WHILE
+      OVER C!		( save next character )
+      1+		( increment address )
+    REPEAT
+    DROP		( drop the final " character )
+    0 SWAP C!		( store final ASCII NUL )
+    HERE @		( push the start address )
+  THEN
+;
+
+: STRLEN		( str -- len )
+  DUP			( save start address )
+  BEGIN
+    DUP C@ 0<>		( zero byte found? )
+  WHILE
+    1+
+  REPEAT
+
+  SWAP -		( calculate the length )
+;
+
+: CSTRING		( addr len -- c-addr )
+  SWAP OVER		( len saddr len )
+  HERE @ SWAP		( len saddr daddr len )
+  CMOVE			( len )
+
+  HERE @ +		( daddr+len )
+  0 SWAP C!		( store terminating NUL char )
+
+  HERE @ 		( push start address )
+;
+
+( -------------------- THE ENVIRONMENT -------------------- 
+
+  Note: the following doesn't seem to work the same way in Mac OS X.
+
+  When _main is called by the _start function, 
+  
+	X0 will contain argc
+	X1 will contain argv, a pointer to an array of pointers
+	X2 will contain envp,               - " -
+
+  Each pointer in the array of pointers points to a C string (NULL-
+  terminated array of bytes).  X0 tells how many pointers there are
+  in the array of pointers pointed to by argv.
+
+     	argv[argc] is a NULL pointer.
+
+  The first word that we define, ARGC, pushes the number of command
+  line arguments (note that as with C argc, this includes the name of
+  the command).  
+)
+
+: ARGC
+  UNIX_ARGC @
+;
+
+( n ARGV gets the nth command line argument.
+  For example to print the command name you would do: 0 ARGV TELL CR
+  And to print the last argument you would do: ARGC 1- ARGV TELL CR
+)
+
+: ARGV			( n -- str u )
+  CELLS UNIX_ARGV @ +	( get the address of argv[n] entry )
+  @  	   	       	( get the address of the string )
+  DUP STRLEN		( and get its length / turn it into a FORTH string )
+;
+
+( ENVIRON returns the address of the first environment string.  
+  The list of strings ends with a NULL pointer.
+
+  For example to print the first string in the environment you could do:
+  ENVIRON @ DUP STRLEN TELL
+)
+
+: ENVIRON	( -- addr )
+  UNIX_ENVP @
+;
+
+( -------------------- SYSTEM CALLS AND FILES --------------------
+
+  Miscellaneous words related to system calls, and standard access to files.
+)
+
+( BYE exits by calling doing the exit system call )
+: BYE		( -- )
+  0		( return code (0) )
+  SYS_EXIT	( system call number )
+  SYSCALL1
+;
+
+( UNUSED returns the number of cells remaining in the user memory
+  (data segment). The system call brk(2) is no longer used in Mac OS X so
+  memory is currently allocated in a large chunk, governed by the
+  constant INITIAL_DATA_SEGMENT_SIZE at the end of M.s
+)
+
+: UNUSED
+  DATA_SEGMENT_SIZE HERE @ DATA_SEGMENT - - __WORDSIZE /
+;
+
+: MORECORE
+  ." Sorry, MORECORE is not implemented." CR
+;
+
+( Standard FORTH provides some simple file access primitives which we model on
+  top of syscalls. The main complication is converting FORTH strings
+  (address & length) into C strings for the UNIX kernel.
+
+  Notice there is no buffering in this implementation.
+)
+
+
+
+
+( -------------------- WELCOME MESSAGE -------------------- 
+
+	Print the version and OK prompt.
+)
+
+: WELCOME
+  S" TEST-MODE" FIND NOT IF
+    ." M-FORTH VERSION " VERSION . CR
+    UNUSED . ." CELLS REMAINING" CR
+    ." OK "
+  THEN
+;
+
+WELCOME
+HIDE WELCOME
