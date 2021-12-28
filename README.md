@@ -20,6 +20,10 @@ changes <tt>BASE</tt> to 10 or 16, respectively.
 <b>2021-12-20</b>: Fixed some serious bugs with LITSTRING and >CFA
 so now you can print strings with <tt>." Hello world"</tt>.
 </p>
+<p>
+<b>2021-12-28</b>: Very stable now.  Almost all of the library code
+in <tt>stdlib.f</tt> is ready.  (Expect to be finished in a few days.)
+</p>
 
 
 ## Introduction and background
@@ -141,7 +145,8 @@ messing around with the internal data structures.
 stack overflow on the return stack.  You can disable this with
 the <tt>STACKWARNING</tt> option in the <tt>Makefile</tt> but
 in my experience, checking for stack underflow/overflow doesn't
-take much time.  While it would be nice to check for data stack
+add much to overall execution time.
+While it would be nice to check for data stack
 overflow and return stack underflow, this is unfortunately not
 implemented (yet).
 
@@ -152,7 +157,7 @@ for sticking to the ANS FORTH convention is that you can use <tt>AND</tt>,
 
 - Jones Forth relies on the brk(2) system call to figure out where
 the data segment starts and to request some initial space. In recent
-Mac OS X, brk has been discontinued so I use allocate space for
+Mac OS X, brk has been discontinued so I allocate space for
 the data segment with a constant <tt>INITIAL_DATA_SEGMENT_SIZE</tt>
 in the BSS segment. This does not seem to affect the size of the
 binary for M-FORTH.
