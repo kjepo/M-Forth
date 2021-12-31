@@ -5,7 +5,7 @@
   ;; Push register on data stack
 .macro	PUSH  	register
 	;; don't know how to detect if we've blown the data stack
-	STR   	\register, [SP, #-16]!
+	STR   	\register, [SP, #-M_STACKITEMSIZE]!
 .endm
 
 	;; Pop register from data stack
@@ -18,7 +18,7 @@
   B.GE STACKUNDERFLOW
   #endif
 
-	LDR   	\register, [SP], #16
+	LDR   	\register, [SP], #M_STACKITEMSIZE
 .endm
 
 	;; Push register on return stack
@@ -30,17 +30,17 @@
   B.LE STACKOVERFLOW
   #endif
 	
-	STR   	\register, [X9, #-16]!
+	STR   	\register, [X9, #-M_STACKITEMSIZE]!
 .endm
 
 	;; Pop register from return stack
 .macro	POPRSP 	register
   ;; detection of empty RSP is not implemented
-	LDR   	\register, [X9], #16
+	LDR   	\register, [X9], #M_STACKITEMSIZE
 .endm
 
 	.text
-  .balign 16
+  .balign M_WORDSIZE
 STACKOVERFLOW:
   KPRINT "STACK OVERFLOW\n"
   B _main

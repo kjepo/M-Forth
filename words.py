@@ -4,7 +4,7 @@ prev = "0"
 
 def header(name, label, flags):
     print("\t.data")
-    print("\t.balign 8")
+    print("\t.balign M_WORDSIZE")
     print("\t.globl name_" + label)
     print("name_" + label + ":")
     print("\t.quad " + prev)
@@ -13,7 +13,7 @@ def header(name, label, flags):
     else:
         print("\t.byte " + str(len(name)))
     print("\t.ascii \"" + name + "\"")
-    print("\t.balign 8")         # should be 8? fixit
+    print("\t.balign M_WORDSIZE")
     print("\t.globl " + label)
     print(label + ":")
 
@@ -52,7 +52,7 @@ def mkvar(name, label, initial=0, flags=0):
 		 "PUSH X0",
 		 "NEXT",
 		 ".data",
-		 ".balign 8",
+		 ".balign M_WORDSIZE",
 		 "var_" + name + ":",
 		 ".quad " + str(initial)
 	 ], flags)
@@ -90,7 +90,7 @@ prev = mkcode("?DUP", "QDUP", [  # duplicate top of stack if non-zero
     "1: NEXT"
 ])
 
-prev = mkcode("ROT", "ROT", [  # rotate top three stack items ( a b c -- b c a )
+prev = mkcode("ROT", "ROT", [  # rotate top 3 stack items ( a b c -- b c a )
     "POP X0",
     "POP X1",
     "POP X2",
@@ -100,7 +100,7 @@ prev = mkcode("ROT", "ROT", [  # rotate top three stack items ( a b c -- b c a )
     "NEXT"
 ])
 
-prev = mkcode("-ROT", "NROT", [  # rotate top three stack items ( a b c -- c a b )
+prev = mkcode("-ROT", "NROT", [  # rotate top 3 stack items ( a b c -- c a b )
     "POP X0",
     "POP X1",
     "POP X2",
@@ -232,9 +232,17 @@ prev = mkcode("0<>", "ZNEQU", [   # top of stack not 0?
 ])
 
 prev = mkcode("AND", "AND", [  
-    "POP X0",
-    "POP X1",
-    "AND X0, X0, X1",
+    "POP  X0",
+    "POP  X1",
+    "AND  X0, X0, X1",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("OR", "OR", [
+    "POP  X0",
+    "POP  X1",
+    "ORR  X0, X0, X1",
     "PUSH X0",
     "NEXT"
 ])
@@ -424,8 +432,8 @@ prev = mkcode("LITSTRING", "_LITSTRING", [
     "PUSH X8",                  # push addr of start of string
     "PUSH X0",                  # push length of the string
     "ADD  X8, X0, X8",          # skip past the string
-    "ADD  X8, X8, #7",
-    "AND  X8, X8, #~7",
+    "ADD  X8, X8, #M_WORDSIZE1",
+    "AND  X8, X8, #~M_WORDSIZE1",
     "NEXT" ])
 
 # TELL prints a string
@@ -466,6 +474,37 @@ prev = mkcode("SYSCALL1", "SYSCALL1", [
     "PUSH X0",
     "NEXT"
 ])
+
+prev = mkcode("SYSCALL2", "SYSCALL2", [
+    "POP X16",                  # system call number
+    "POP X1",                   # argument
+    "POP X0",                   # argument
+    "SVC 0",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("SYSCALL3", "SYSCALL3", [
+    "POP X16",                  # system call number
+    "POP X2",                   # argument (nr of bytes)
+    "POP X1",                   # argument (buffer address)
+    "POP X0",                   # argument (file descriptor)
+    "SVC 0",
+    "PUSH X0",
+    "NEXT"
+])
+
+prev = mkcode("SYSCALL4", "SYSCALL4", [
+    "POP X16",                  # system call number
+    "POP X3",                   # argument
+    "POP X2",                   # argument
+    "POP X1",                   # argument
+    "POP X0",                   # argument
+    "SVC 0",
+    "PUSH X0",
+    "NEXT"
+])
+
 
 prev = mkcode("DATA_SEGMENT", "DATA_SEGMENT", [
     "KLOAD X0, data_segment",
@@ -518,8 +557,18 @@ prev = mkconstint("VERSION", "VERSION", "M_VERSION")
 prev = mkconstint("F_HIDDEN", "__F_HIDDEN", "F_HIDDEN")
 prev = mkconstint("F_IMMED", "__F_IMMED", "F_IMMED")
 prev = mkconstint("F_LENMASK", "__F_LENMASK", "F_LENMASK")
-
 prev = mkconstint("SYS_EXIT", "SYS_EXIT", "__NR_exit")
+prev = mkconstint("SYS_OPENAT", "SYS_OPENAT", "__NR_openat")
+prev = mkconstint("SYS_CLOSE", "SYS_CLOSE", "__NR_close")
+prev = mkconstint("SYS_READ", "SYS_READ", "__NR_read")
+
+# these are from fcntl.h 
+prev = mkconstint("O_RDONLY", "O_RDONLY", "__O_RDONLY")
+prev = mkconstint("O_WRONLY", "O_WRONLY", "__O_WRONLY")
+prev = mkconstint("O_RDWR", "O_RDWR", "__O_RDWR")
+prev = mkconstint("O_CREAT", "O_CREAT", "__O_CREAT")
+prev = mkconstint("O_TRUNC", "O_TRUNC", "__O_TRUNC")
+prev = mkconstint("AT_FDCWD", "AT_FDCWD", "__AT_FDCWD")
 
 prev = mkvar("STATE", "STATE")
 prev = mkvar("HERE", "HERE")

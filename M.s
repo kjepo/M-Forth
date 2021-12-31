@@ -91,9 +91,19 @@
   .set F_HIDDEN,0x20
   .set F_LENMASK,0x1f           ; length mask
 	
-  ;; system call numbers can be found in syscall.h if you have downloaded XCode, e.g.
-  ;; typically in /Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include/sys/syscall.h
+  ;; system call numbers can be found in syscall.h if you have XCode, typically
+  ;; /Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include/sys/syscall.h
   .set __NR_exit, 1		; SYS_exit
+  .set __NR_openat, 463		; SYS_open
+  .set __NR_close, 6		; SYS_close
+  .set __NR_read, 3	
+  ;; flags for open(2) etc are in fcntl.h
+  .set __O_RDONLY, 0
+  .set __O_WRONLY, 1
+  .set __O_RDWR, 2
+  .set __AT_FDCWD, -2	
+  .set __O_CREAT, 0x200
+  .set __O_TRUNC, 0x400
 
   ;; NEXT is the heart of the inner interpreter.
   ;; It fetches and jumps to the next instruction.
@@ -606,7 +616,7 @@ _set_up_data_segment:
   ;; Here, we read a 64-bit word from /dev/urandom
   ;; and put it in var_RNDSEED
 _RANDOMIZE:
-  MOV     X0, #-2               ; AT_FDCWD
+  MOV     X0, #__AT_FDCWD
   KLOAD   X1, urandom
   MOV     X2, #0                ; O_RDONLY
   MOV     X3, #0666             ; S_RDWR
@@ -617,10 +627,10 @@ _RANDOMIZE:
   KPRINT  "Error: could not open /dev/urandom\n"
   B       _HALT
 3:
-  MOV     X0, X11
-  KLOAD   X1, var_RNDSEED
-  MOV     X2, #4
-  MOV     X16, #SYS_read
+  MOV     X0, X11		; X0 = file descriptor
+  KLOAD   X1, var_RNDSEED	; X1 = buffer
+  MOV     X2, #4		; X2 = nr of bytes to read
+  MOV     X16, #__NR_read	; X16 = syscall number
   SVC     0
   RET
 

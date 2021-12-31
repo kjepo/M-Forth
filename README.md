@@ -24,6 +24,14 @@ so now you can print strings with <tt>." Hello world"</tt>.
 <b>2021-12-28</b>: Very stable now.  Almost all of the library code
 in <tt>stdlib.f</tt> is ready.  (Expect to be finished in a few days.)
 </p>
+<p>
+<b>2021-12-31</b>: It's New Year's Eve and I managed to get M-FORTH
+up and running.  There's an annoying bug (?) with <tt>FILE-OPEN</tt>
+which returns the file descriptor 2 rather than a negative value.
+Also, it would be nice if <tt>DOES></tt> could be implemented.
+But we have to save something for 2022!
+
+</p>
 
 
 ## Introduction and background
@@ -161,6 +169,13 @@ Mac OS X, brk has been discontinued so I allocate space for
 the data segment with a constant <tt>INITIAL_DATA_SEGMENT_SIZE</tt>
 in the BSS segment. This does not seem to affect the size of the
 binary for M-FORTH.
+
+- The user-defined word <tt>.S</tt> prints the contents of the stack
+(non-destructively) but in my implementation I've decided to
+(1) print the content with <tt>.</tt> rather than <tt>U.</tt> so
+that negative values don't appear unsigned; (2) the stack is
+printed in the order so that the top element is shown to the right.
+
 
 # Things to do (unsorted)
 

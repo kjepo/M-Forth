@@ -251,10 +251,10 @@
 : NIP ( x y -- y ) SWAP DROP ;
 : TUCK ( x y -- y x y ) SWAP OVER ;
 : PICK ( x_u ... x_1 x_0 u -- x_u ... x_1 x_0 x_u )
-  1+              ( add one because of 'u' on the stack )
-  16 *            ( multiply by the word size )
-  DSP@ +          ( add to the stack pointer )
-  @               ( and fetch )
+  1+                 ( add one because of 'u' on the stack )
+  __STACKITEMSIZE *  ( multiply by the word size )
+  DSP@ +             ( add to the stack pointer )
+  @                  ( and fetch )
 ;
 
 ( With the looping constructs, we can now write SPACES,
@@ -320,22 +320,6 @@
   THEN
   +
   EMIT
-;
-
-(
-  FORTH word .S prints the contents of the stack.  It doesn't alter the stack.
-  Very useful for debugging.
-)
-: .S              ( -- )
-  DSP@            ( get current stack pointer )
-  BEGIN
-    DUP S0 @ <
-  WHILE
-    DUP @ U.      ( print the stack element )
-    SPACE
-    16 +          ( move up )
-  REPEAT
-  DROP
 ;
 
 ( This word returns the width (in characters) of an unsigned number in
@@ -410,6 +394,30 @@
 ( The real U., note the trailing space. )
 : U. U. SPACE ;
 
+(
+  FORTH word .S prints the contents of the stack.  It doesn't alter the stack.
+  Very useful for debugging.
+  Note (difference from Jones Forth) : I've moved the definition of .S to here,
+  after ".", and I'm using "." instead of U. so that negative numbers on the
+  stack don't appear unsigned.  Also, the stack is printed in the order which
+  is more commonly accepted, i.e., -2 -1 0 1 2 .S => -2  -1  0  1  2
+)
+
+: .S
+  S0 @		  ( start at bottom of stack )
+  __STACKITEMSIZE -
+  BEGIN
+    DUP DSP@ __STACKITEMSIZE + >
+  WHILE
+    DUP @ .
+    SPACE
+    __STACKITEMSIZE -
+  REPEAT
+  DROP
+;
+    
+
+
 ( ? fetches the integer at an address and prints it. )
 : ? ( addr -- ) @ . ;
 
@@ -433,11 +441,11 @@
 ( DEPTH returns the depth of the stack )
 : DEPTH           ( -- n )
   S0 @ DSP@ -
-  16 -            ( adjust because S0 was on the stack when we pushed DSP )
+  __STACKITEMSIZE -            ( adjust because S0 was on the stack when we pushed DSP )
 ;
 
 ( ALIGNED takes an address and rounds it up (aligns it)
-  to the next 16 byte boundary )
+  to the next byte boundary )
 : ALIGNED         ( addr -- addr )
   7 + 
   7 INVERT AND   ( (addr+7) & ~7 )
@@ -459,7 +467,7 @@
 
  In compile mode we append
 
-    LITSTRING <string length> <string rounded up 16 bytes>
+    LITSTRING <string length> <string rounded up __WORDSIZE bytes>
 
  to the current word.  The primitive LITSTRING does the right thing when the
  current word is executed.
@@ -491,7 +499,7 @@
     HERE @ SWAP - ( calculate the length )
     __WORDSIZE -  ( subtract padding size )
     SWAP !        ( and back-fill the length location )
-    ALIGN         ( round up to next multiple of 16 bytes for the residual )
+    ALIGN         ( round up to next multiple of bytes for the residual )
   ELSE            ( immediate mode )
     HERE @        ( get the start address of the temporary space )
     BEGIN
@@ -517,7 +525,7 @@
  we get to the next double quote.
 
  In compile mode we use S" to store the string, then add TELL afterwards:
- LITSTRING <string length> <string rounded up to 16 bytes> TELL
+ LITSTRING <string length> <string rounded up to 8 bytes> TELL
 
  It may be interesting to note the use of [COMPILE] to turn the call to the
  immediate word S" into compilation of that word.  It compiles it into the
@@ -1438,7 +1446,7 @@ VARIABLE X
 ;
 
 : CATCH		( xt -- exn? )
-  ( save parameter stack pointer (+16 because of xt) on return stack )
+  ( save parameter stack pointer (+ 16 because of xt) on return stack )
   DSP@ __STACKITEMSIZE + >R	
   ( push the address of the RDROP inside EXCEPTION-MARKER ... )
   ' EXCEPTION-MARKER __STACKITEMSIZE +
@@ -1710,8 +1718,110 @@ VARIABLE X
   Notice there is no buffering in this implementation.
 )
 
+( file access modes (fam) )
+: R/O O_RDONLY ;
+: R/W O_RDWR ;
 
+( Mystery: when openat(2) fails to find the file, it returns 2 rather than <0 )
 
+( S" foo.txt" R/O OPEN-FILE )
+: OPEN-FILE		( addr u fam -- ... (see below) )
+  -ROT			( fam addr u )
+  CSTRING		( fam cstring )
+  AT_FDCWD   	        ( fam cstring AT_FDCWD )
+  -ROT                  ( AT_FDCWD fam cstring )
+  SWAP			( AT_FDCWD cstring fam )
+  438  			( AT_FDCWD cstring fam S_RDWR )
+  SYS_OPENAT		( AT_FDCWD cstring fam S_RDWR sys_open )
+  SYSCALL4
+  ." After open system call: " .S CR
+  DUP			( fd fd )
+  DUP 0< IF		( errno? )
+    NEGATE		( fd errno, if there was an error )
+  ELSE
+    DROP 0		( fd 0, if successful )
+  THEN
+;
+
+( S" foo.txt" R/W CREATE-FILE )
+: CREATE-FILE		( addr u fam -- ... (see below) )
+  O_CREAT OR
+  O_TRUNC OR		( flags|O_TRUNC|O_CREAT )
+  DROP O_CREAT
+  -ROT			( fam addr u )
+  CSTRING		( fam cstring )
+  SWAP                  ( cstring fam )
+  420                   ( cstring fam 0644 )
+  SYS_OPENAT            ( X0=cstring X1=fam X2=0644 X16=SYS_OPENAT )
+  SYSCALL3 	        ( open(filename, flags|O_TRUNC|O_CREAT, 0644) )
+  DUP			( fd fd )
+  DUP 0< IF		( errno? )
+    NEGATE		( fd errno )
+  ELSE
+    DROP 0		( fd 0 )
+  THEN
+;
+
+: CLOSE-FILE		( fd -- 0 (successful) | fd -- errno (error) )
+  SYS_CLOSE SYSCALL1
+  NEGATE
+;
+
+: READ-FILE		( addr u fd -- ... (see below) )
+  -ROT          	( fd addr u )
+  SWAP
+  SYS_READ		( fd addr u SYS_READ )
+  SYSCALL3
+  DUP			( u2 u2 )
+  DUP 0< IF		( errno? )
+    NEGATE		( u2 errno )
+  ELSE
+    DROP 0		( u2 0 )
+  THEN
+;
+  
+( PERROR prints a message for an errno, similar to C's perror(3) but we don't have the extensive
+  list of strerror strings available, so all we can do is print the errno. )
+: PERROR	( errno addr u -- )
+  TELL
+    ':' EMIT SPACE
+    ." ERRNO="
+    . CR
+;
+
+( Here's a small example of reading the first 42 characters of this file )
+
+VARIABLE BUF
+VARIABLE BUFSIZ
+VARIABLE FD
+
+: FILETEST
+  S" this is a buffer which will be overwritten"  ( => addr n )
+  BUFSIZ !
+  BUF !
+  ." buffert before: " BUF @ BUFSIZ @ TELL CR
+  S" stdlib.f" R/O OPEN-FILE
+  ." After OPEN-FILE: "  .S CR
+  0<> IF ." file not found" CR EXIT THEN
+  DUP FD !
+  ." file descriptor = " FD @ . CR
+  BUFSIZ @ BUF @ FD @ READ-FILE
+  DROP
+  CLOSE-FILE
+  ." buffert after : " BUF @ BUFSIZ @ TELL CR
+;
+
+( -------------------- ASSEMBLER CODE
+
+  This is NYI for the M1 ARM processor
+
+)
+
+( NOTES ----------------------------------------------------------------------
+
+  DOES> isn't possible to implement with this FORTH because we don't have a
+  separate data pointer.
+)
 
 ( -------------------- WELCOME MESSAGE -------------------- 
 
