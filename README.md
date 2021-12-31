@@ -2,9 +2,9 @@
 
 ## Abstract
 M-Forth is an implementation of FORTH for the M1 processor on Mac OS X.
-<p>
-<b>Note:</b> This is work in progress and not yet ready for release.
-<p>
+
+### Revision history
+
 <b>2021-12-06</b>: M-Forth is now capable of running
 all the code in <tt>stdlib.f</tt>. Not all primitives are ready though,
 and documentation is still incomplete. The primitive "." prints in hex
