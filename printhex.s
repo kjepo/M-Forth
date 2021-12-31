@@ -45,6 +45,48 @@ printhex1:
 
   RET
 
+  .text
+  .balign 8
+printhex8:
+
+  PUSH  LR
+  PUSH  X1
+  PUSH  X2
+  PUSH  X3
+  PUSH  X4
+  PUSH  X5
+
+  KLOAD   X1, hexbuf            ; X1 = &hexbuf
+  ADD     X1, X1, #1            ; X1 = X1 + 2 (length of hexbuf)
+  MOV     W5, #2                ; loop counter: 1 byte = 2 characters to print
+printhex8_1:
+  AND     W2, W0, #0xf          ; W2 = W0 & 0xf   LLDB: reg read x0, x2
+  KLOAD   X3, hexchars          ; LLDB: mem read $x3
+  LDR     W4, [X3, X2]          ; W4 = *[X3 + X2]
+  STRB    W4, [X1]              ; *X1 = W4
+  SUB     X1, X1, #1            ; X1 = X1 - 1
+  LSR     X0, X0, #4            ; X0 = X0 >> 4
+  SUBS    W5, W5, #1            ; X5 = X5 - 1 (update condition flags)
+  B.NE    printhex8_1             ; if X5 != 0 GOTO printhex1
+
+  ;; Print string hexbuf
+  MOV     X0, #1                ; 1 = StdOut
+  KLOAD   X1, hexbuf            ; string to print
+  MOV     X2, #2                ; length of our string
+  MOV     X16,#4                ; MacOS write system call
+  SVC     0                     ; Output the string
+
+  POP X5
+  POP X4
+  POP X3
+  POP X2
+  POP X1
+  POP LR
+
+  RET
+	
+
+
 	.balign 8
 	.data
 hexchars:
