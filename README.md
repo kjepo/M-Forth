@@ -131,7 +131,9 @@ or not (consisting of links to other words).
 
 ## Control structures
 
-### *condition* `IF` *true part* `THEN`
+### *condition* `IF` *true-part* `THEN`
+
+Algol equivalent: `IF` *condition* `THEN` *true-part*
 
 ```
 : ABS		( a -- |a| )
@@ -142,7 +144,9 @@ or not (consisting of links to other words).
 ;
 ```
 
-### *condition* `IF` *true part* `ELSE` *false part* `THEN`
+### *condition* `IF` *true-part* `ELSE` *false-part* `THEN`
+
+Algol equivalent: `IF` *condition* `THEN` *true-part* `ELSE` *else-part*
 
 ```
 : MAX		( a b -- max(a,b) )
