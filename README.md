@@ -150,12 +150,45 @@ Algol equivalent: `IF` *condition* `THEN` *true-part* `ELSE` *else-part*
 
 ```
 : MAX		( a b -- max(a,b) )
-  2DUP    	( a b ab )
+  2DUP    	( a b a b )
   > IF		( a b )
     DROP	( a )
   ELSE
     SWAP DROP   ( b )
   THEN
+;
+```
+
+### `BEGIN` *loop-part* *condition* `UNTIL`
+
+Algol: `DO` *loop-part* `WHILE` *condition*
+
+```
+( Write n spaces )
+: SPACES	( n -- )
+  BEGIN
+    SPACE	
+    -1 +        ( n-1 -- )
+    DUP 0 =
+  UNTIL		( until n=0 )
+;
+```
+
+### `BEGIN` *loop-part* `AGAIN`
+
+Algol: `WHILE` true `DO` *loop-part*
+
+```
+( print random numbers 0..9 until 0 is found )
+: RANDOM-NUMBERS  ( -- )
+  RANDOMIZE
+  BEGIN
+    RND 10 MOD
+    DUP . CR	  ( print random number 0..9 )
+    0= IF
+      EXIT	  ( use EXIT to leave infinite loop )
+    THEN	
+  AGAIN
 ;
 ```
 
