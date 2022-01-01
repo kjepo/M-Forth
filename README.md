@@ -127,6 +127,35 @@ a pointer to a piece of code that handles the word.  What is meant by
 "handling" the word depends on the word being a primitive (written in assembler)
 or not (consisting of links to other words).
 
+# M-FORTH language specifics
+
+## Control structures
+
+### *condition* `IF` *true part* `THEN`
+
+```
+: ABS		( a -- |a| )
+  DUP		( a a )
+  0< IF		( a )
+    NEGATE	( -a )
+  THEN
+;
+```
+
+### *condition* `IF` *true part* `ELSE` *false part* `THEN`
+
+```
+: MAX		( a b -- max(a,b) )
+  2DUP    	( a b ab )
+  > IF		( a b )
+    DROP	( a )
+  ELSE
+    SWAP DROP   ( b )
+  THEN
+;
+```
+
+
 # Deviations from Jones Forth
 
 - Jones relies heavily on macros <tt>defcode</tt>, <tt>defvar</tt>
