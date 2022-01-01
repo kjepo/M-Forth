@@ -136,6 +136,7 @@ or not (consisting of links to other words).
 Algol equivalent: `IF` *condition* `THEN` *true-part*
 
 ```
+( Calculate the absolute value, e.g., -3 ABS -- 3 )
 : ABS           ( a -- |a| )
   DUP           ( a a )
   0< IF         ( a )
@@ -149,6 +150,7 @@ Algol equivalent: `IF` *condition* `THEN` *true-part*
 Algol equivalent: `IF` *condition* `THEN` *true-part* `ELSE` *else-part*
 
 ```
+( Find maximum value, e.g., 5 9 MAX -- 9 )
 : MAX           ( a b -- max(a,b) )
   2DUP          ( a b a b )
   > IF          ( a b )
@@ -164,7 +166,7 @@ Algol equivalent: `IF` *condition* `THEN` *true-part* `ELSE` *else-part*
 Algol: `DO` *loop-part* `WHILE` *condition*
 
 ```
-( Write n spaces )
+( Write n spaces, e.g., 10 SPACES writes 10 " " )
 : SPACES        ( n -- )
   BEGIN
     SPACE       
@@ -179,7 +181,7 @@ Algol: `DO` *loop-part* `WHILE` *condition*
 Algol: `WHILE` true `DO` *loop-part*
 
 ```
-( print random numbers 0..9 until 0 is found )
+( Print random numbers 0..9 until 0 occurs )
 : RANDOM-NUMBERS  ( -- )
   RANDOMIZE
   BEGIN
@@ -199,6 +201,7 @@ Note that since `BEGIN` ... `AGAIN` forms an infinite loop, you must exit with `
 Algol: `WHILE` *condition* `DO` *loop-part*
 
 ```
+( Calculate sum of a + ... + b, e.g., 1 10 SUM -- 55 )
 : SUM           ( a b -- sum ) ( if a < b, sum is 0 )
   0             ( a b 0 )
   -ROT          ( 0 a b )
@@ -222,6 +225,7 @@ Algol: `WHILE` *condition* `DO` *loop-part*
 Algol: `IF` not condition `THEN` *true-part*
 
 ```
+( Return TRUE if negative, otherwise FALSE, e.g., -3 NEGATIVE -- TRUE )
 : NEGATIVE	( a -- TRUE | FALSE )
   TRUE		( a TRUE )
   SWAP		( TRUE a )
@@ -230,6 +234,8 @@ Algol: `IF` not condition `THEN` *true-part*
   THEN
 ;
 ```
+
+
 
 
 
