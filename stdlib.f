@@ -145,7 +145,7 @@
   AGAIN
 ;
 
-\ ALGOL: while <condition> DO <loop-part> 
+\ ALGOL: WHILE <condition> DO <loop-part> 
 \ FORTH: BEGIN <condition> WHILE <loop-part> REPEAT
 \    ==> <condition> 0BRANCH OFFSET2 <loop-part> BRANCH OFFSET
 \ where OFFSET points back to <condition> (the beginning)
@@ -201,12 +201,7 @@
    0 0 = UNLESS '0' EMIT THEN \ should not print
 ;
 
-\ Exercise: implement TIMES, which would execute a code block n number of times
-\ 10 TIMES <body END
-\ 
-
-
-
+\ -------------------- ( COMMENTS ) --------------------
 
 \ FORTH allows ( ... ) as comments within function definitions.
 \ This works by having an IMMEDIATE word called ( which just drops

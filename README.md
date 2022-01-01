@@ -45,16 +45,16 @@ Words can be either <i>primitive</i>, i.e., written in assembly language,
 or defined in terms of other words.  The syntax for defining a new word is
 <p>
 <tt>:</tt> <i>word</i> <i>word</i><sub>1</sub> <i>word</i><sub>2</sub>
-	   &hellip; <i>word</i><sub>n</sub> <tt>;</tt>
+           &hellip; <i>word</i><sub>n</sub> <tt>;</tt>
 </p>
 <p>
 which is equivalent to
 </p>
 <p>
 <tt>procedure</tt><i>word</i>() { <tt>call</tt> <i>word</i><sub>1</sub>();
-	        <tt>call</tt> <i>word</i><sub>2</sub>();
-		&hellip;
-	        <tt>call</tt> <i>word</i><sub>n</sub>(); }
+                <tt>call</tt> <i>word</i><sub>2</sub>();
+                &hellip;
+                <tt>call</tt> <i>word</i><sub>n</sub>(); }
 </p>
 in a traditional programming language.
 Notice that in Forth, arguments to words are not named.
@@ -136,10 +136,10 @@ or not (consisting of links to other words).
 Algol equivalent: `IF` *condition* `THEN` *true-part*
 
 ```
-: ABS		( a -- |a| )
-  DUP		( a a )
-  0< IF		( a )
-    NEGATE	( -a )
+: ABS           ( a -- |a| )
+  DUP           ( a a )
+  0< IF         ( a )
+    NEGATE      ( -a )
   THEN
 ;
 ```
@@ -149,10 +149,10 @@ Algol equivalent: `IF` *condition* `THEN` *true-part*
 Algol equivalent: `IF` *condition* `THEN` *true-part* `ELSE` *else-part*
 
 ```
-: MAX		( a b -- max(a,b) )
-  2DUP    	( a b a b )
-  > IF		( a b )
-    DROP	( a )
+: MAX           ( a b -- max(a,b) )
+  2DUP          ( a b a b )
+  > IF          ( a b )
+    DROP        ( a )
   ELSE
     SWAP DROP   ( b )
   THEN
@@ -165,12 +165,12 @@ Algol: `DO` *loop-part* `WHILE` *condition*
 
 ```
 ( Write n spaces )
-: SPACES	( n -- )
+: SPACES        ( n -- )
   BEGIN
-    SPACE	
+    SPACE       
     -1 +        ( n-1 -- )
     DUP 0 =
-  UNTIL		( until n=0 )
+  UNTIL         ( until n=0 )
 ;
 ```
 
@@ -184,13 +184,53 @@ Algol: `WHILE` true `DO` *loop-part*
   RANDOMIZE
   BEGIN
     RND 10 MOD
-    DUP . CR	  ( print random number 0..9 )
+    DUP . CR      ( print random number 0..9 )
     0= IF
-      EXIT	  ( use EXIT to leave infinite loop )
-    THEN	
+      EXIT        ( use EXIT to leave infinite loop )
+    THEN        
   AGAIN
 ;
 ```
+
+Note that since `BEGIN` ... `AGAIN` forms an infinite loop, you must exit with `EXIT`, which returns from the word.
+
+### `BEGIN` *condition* `WHILE` *loop-part* `REPEAT`
+
+Algol: `WHILE` *condition* `DO` *loop-part*
+
+```
+: SUM           ( a b -- sum ) ( if a < b, sum is 0 )
+  0             ( a b 0 )
+  -ROT          ( 0 a b )
+  BEGIN
+    2DUP <=     ( while a <= b ... )
+  WHILE         ( sum a b )
+    -ROT        ( b sum a )
+    DUP         ( b sum a a )
+    -ROT        ( b a sum a )
+    +           ( b a sum+a )
+    -ROT        ( sum+a b a )
+    1+          ( sum+a b a+1 )
+    SWAP        ( sum+a a+1 b )
+  REPEAT
+  DROP DROP     ( sum )
+;
+```
+
+### *condition* `UNLESS` *true-part* `THEN`
+
+Algol: `IF` not condition `THEN` *true-part*
+
+```
+: NEGATIVE	( a -- TRUE | FALSE )
+  TRUE		( a TRUE )
+  SWAP		( TRUE a )
+  0< UNLESS
+    1+		( TRUE -> FALSE )
+  THEN
+;
+```
+
 
 
 # Deviations from Jones Forth
@@ -242,6 +282,14 @@ binary for M-FORTH.
 that negative values don't appear unsigned; (2) the stack is
 printed in the order so that the top element is shown to the right.
 
+- Normally, M-FORTH is started with
+```
+    cat stdlib.f - | ./M
+```
+but if M-FORTH is started without loading `stdlib.f`, there is still
+a primitive form of `.` which prints the top-of-stack as a 64-bit
+hexadecimal number.  This is a useful debugging tool when working
+with the core interpreter.
 
 # Things to do (unsorted)
 
