@@ -309,4 +309,4 @@ with the core interpreter.
 - `DO` ... `LOOP` with `LEAVE`, `CONTINUE` and `I` inside the body
 - A variable, like `BASE` for case sensitivity, so we can write `dup` as well as `DUP`.
 - Documentation
-- `:NONAME` doesn't seem to work
+- `:NONAME` doesn't seem to work &mdash; bombs on `0 0 CREATE`
