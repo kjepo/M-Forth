@@ -1,8 +1,6 @@
-\ The primitive word /MOD leaves both the quotient and
-\ the remainder on the stack. Now we can define / and
-\ MOD in terms of /MOD
-: / /MOD SWAP DROP ;
-: MOD /MOD DROP ;
+\ Jones Forth has /MOD as a primitive and defines / and MOD as user-defined words.
+\ For the ARM processor, it makes more sense to define / and MOD as primitives.
+\ I've decided to include /MOD as a primitive as well, for compatibility reasons.
 
 \ Define some character constants
 : '\n' 10 ;  \ newline
@@ -38,6 +36,14 @@
 : '-' [ CHAR - ] LITERAL ;
 : '.' [ CHAR . ] LITERAL ;
 
+\ VT100 screen control:
+
+\ HOME moves cursor to top left
+: HOME 27 EMIT 91 EMIT ';' EMIT 102 EMIT ;
+
+\ PAGE clears the screen
+: PAGE 27 EMIT 91 EMIT 50 EMIT 74 EMIT ;
+
 \ '[COMPILE] word' compiles 'word' if it would otherwise be IMMEDIATE
 : [COMPILE] IMMEDIATE
   WORD   \ get the next word
@@ -58,55 +64,68 @@
   ,         \ compile it
 ;
 
-\ CONTROL STRUCTURES
+\ -------------------- CONTROL STRUCTURES --------------------
 \ Please note that the control structures as defined here will only
 \ work inside compiled words.  In immediate mode, they won't work.
 
-\ Algol: IF <condition> THEN <true-part> ; <rest-part>
-\ FORTH: <condition> IF <true-part> THEN <rest-part> 
-\    ==> <condition> 0BRANCH OFFSET <true-part> <rest-part>
-\ where OFFSET is the offset of <rest-part>
+\ IF-THEN
 \
-
-\ Algol: IF <condition> THEN <true-part> ELSE <false-part> ; <rest-part>
-\ FORTH: <condition> IF <true-part> ELSE <false-part> THEN <rest-part>
-\    ==> <condition> 0BRANCH OFFSET <true-part>
-\                    BRANCH OFFSET2 <false-part> <rest-part>          
-\ where OFFSET is the offset of <false-part>
-\ and OFFSET2 is the offset of <rest-part>
+\ Algol: IF <condition> THEN <true-part> 
+\ FORTH: <condition> IF <true-part> THEN 
+\ Algol: IF <condition> THEN <true-part> ELSE <false-part>
+\ FORTH: <condition> IF <true-part> ELSE <false-part> THEN
+\
+\ Examples:
+\ : ABS           ( a -- |a| )
+\   DUP 0< IF NEGATE THEN
+\ ;
+\
+\ : MAX           ( a b -- max(a,b) )
+\   DUP DUP > IF DROP ELSE SWAP DROP THEN
+\ ;
+\                         ,--------------------------------.
+\                        |                                 |
+\                        |                                 v
+\ <condition> 0BRANCH OFFSET <true-part> BRANCH OFFSET2 <false-part>
+\                                                  |                 ^
+\                                                  |                 |
+\                                                  `-----------------'
 
 : IF IMMEDIATE
   ' 0BRANCH ,   \ compile 0BRANCH
-  HERE @        \ save location of the offset on the stack
-  0 ,           \ compile a dummy offset
+  HERE @        \ save location of OFFSET on the stack
+  0 ,           \ compile a dummy OFFSET
 ;
 
 : THEN IMMEDIATE
   DUP
   HERE @ SWAP - \ calculate the offset from the address saved on the stack
-  SWAP !        \ store the offset in the back-filled location
+  SWAP !        \ store the offset in OFFSET
 ;
 
 : ELSE IMMEDIATE
   ' BRANCH ,    \ definite branch to just over the false-part
-  HERE @        \ save location of the offset on the stack
-  0 ,           \ compile a dummy offset
-  SWAP          \ now back-fill the original (IF) offset
+  HERE @        \ save location of OFFSET2 on the stack
+  0 ,           \ compile a dummy OFFSET2
+  SWAP          \ now back-fill the original (IF) OFFSET
   DUP           \ same as for THEN word above
   HERE @ SWAP -
   SWAP !
 ;
 
-: SIGN 0 < IF -1 ELSE 1 THEN ;
-: TEST#0 
-  -3 SIGN .
-   3 SIGN .
-;
-
+\ BEGIN-UNTIL
+\
 \ ALGOL: DO <loop-part> WHILE <condition>
 \ FORTH: BEGIN <loop-part> <condition> UNTIL
-\    ==> <loop-part> <condition> 0BRANCH OFFSET
-\ where OFFSET points back to <loop-part>
+\
+\ Example:
+\ : SPACES	( n -- )
+\   BEGIN SPACE -1 + DUP 0 = UNTIL
+\ ;
+\       ,---------------------------.
+\      |                            |
+\      v                            |
+\ <loop-part> <condition> 0BRANCH OFFSET
 
 : BEGIN IMMEDIATE
   HERE @      \ save location on the stack
@@ -118,19 +137,25 @@
   ,           \ compile the offset here
 ;
 
-: TEST#1
-  10                \ start with 10
-  BEGIN
-    DUP . CR        \ print it
-    -1 +            \ subtract 1
-    DUP 0 = UNTIL   \ until it's 0
-;
-
+\ BEGIN-AGAIN
+\
 \ ALGOL: WHILE true DO <loop-part>
 \ FORTH: BEGIN <loop-part> AGAIN
-\    ==> <loop-part> BRANCH OFFSET
-\ where OFFSET point back to <loop-part>
-\ In other words, an infinite loop which can only be returned from with EXIT
+\
+\ An infinite loop which can only be returned from with EXIT
+\
+\ Example:
+\
+\ : RANDOM-NUMBERS  ( -- )
+\   RANDOMIZE BEGIN
+\     RND 10 MOD DUP . CR 0= IF EXIT THEN
+\   AGAIN
+\ ;
+\       ,--------------------------.
+\      |                           |
+\      v                           |
+\ <loop-part> <condition> BRANCH OFFSET
+\
 
 : AGAIN IMMEDIATE
   ' BRANCH ,        \ compile BRANCH
@@ -138,18 +163,29 @@
   ,                 \ compile the offset here
 ;
 
-: TEST#3            \ Infinite loop of random numbers [0..10[
-  RANDOMIZE
-  BEGIN
-    RND 10 MOD . CR
-  AGAIN
-;
-
+\ BEGIN-WHILE-REPEAT
+\
 \ ALGOL: WHILE <condition> DO <loop-part> 
 \ FORTH: BEGIN <condition> WHILE <loop-part> REPEAT
-\    ==> <condition> 0BRANCH OFFSET2 <loop-part> BRANCH OFFSET
-\ where OFFSET points back to <condition> (the beginning)
-\ and OFFSET2 points to after the whole piece of code.
+\
+\ Example
+\ : TEST#4
+\   1
+\   BEGIN
+\     DUP 10 <>
+\   WHILE
+\     DUP . CR
+\     1 + 
+\   REPEAT
+\ ;
+\      ,-------------------------------------------.
+\      |                                           |
+\      v                                           |
+\ <condition> 0BRANCH OFFSET2 <loop-part> BRANCH OFFSET
+\                        |                              ^
+\                        |                              |
+\                        `------------------------------'
+\
 
 : WHILE IMMEDIATE
   ' 0BRANCH ,   \ compile 0BRANCH
@@ -164,16 +200,6 @@
   DUP           
   HERE @ SWAP - \ calculate OFFSET2
   SWAP !        \ and back-fill it in the original location
-;
-
-: TEST#4
-  1
-  BEGIN
-    DUP 10 <>
-  WHILE
-    DUP . CR
-    1 + 
-  REPEAT
 ;
 
 \ UNLESS is the same as IF but the test is reversed:
@@ -251,6 +277,9 @@
   DSP@ +             ( add to the stack pointer )
   @                  ( and fetch )
 ;
+
+
+
 
 ( With the looping constructs, we can now write SPACES,
   which writes n spaces to stdout. )

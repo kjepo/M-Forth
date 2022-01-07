@@ -92,7 +92,7 @@
   .set F_LENMASK,0x1f           ; length mask
 	
   ;; system call numbers can be found in syscall.h if you have XCode, typically
-  ;; /Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/usr/include/sys/syscall.h
+  ;; /Library/Developer/CommandLineTools/SDKs/Mac*sdk/usr/include/sys/syscall.h
   .set __NR_exit, 1		; SYS_exit
   .set __NR_openat, 463		; SYS_open
   .set __NR_close, 6		; SYS_close

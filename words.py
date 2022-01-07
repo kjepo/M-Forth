@@ -57,10 +57,47 @@ def mkvar(name, label, initial=0, flags=0):
 		 ".quad " + str(initial)
 	 ], flags)
 
+def mkop(name, label, op):
+    return mkcode(name, label, ["POP X0", "POP X1", op + " X0, X1, X0", "PUSH X0", "NEXT"])
+
 prev = mkcode("EXIT", "EXIT", ["POPRSP X8", "NEXT"])
-prev = mkcode("+", "PLUS", ["POP X0", "POP X1", "ADD X0, X1, X0", "PUSH X0", "NEXT"])
-prev = mkcode("-", "MINUS", ["POP X0", "POP X1", "SUB X0, X1, X0", "PUSH X0", "NEXT"])
-prev = mkcode("*", "TIMES", ["POP X0", "POP X1", "MUL X0, X0, X1", "PUSH X0", "NEXT"])
+prev = mkop("+", "PLUS", "ADD")
+prev = mkop("-", "MINUS", "SUB")
+prev = mkop("*", "TIMES", "MUL")
+prev = mkop("/", "DIV", "SDIV")
+
+# MOD is implemented more as a remainder function rather than
+# the more mathematical definition with equivalence classes.
+# For positive numbers, this is irrelevant but if you throw
+# negative numbers at MOD you may want to check its behaviour.
+# What's implemented here is the same as the C library fmod(3)
+#  printf(" 10 mod  3 == %f\n", fmod( 10,  3)); // => +1
+#  printf(" 10 mod -3 == %f\n", fmod( 10, -3)); // => +1
+#  printf("-10 mod  3 == %f\n", fmod(-10,  3)); // => -1
+#  printf("-10 mod -3 == %f\n", fmod(-10, -3)); // => -1
+# See also https://torstencurdt.com/tech/posts/modulo-of-negative-numbers/
+
+prev = mkcode("MOD", "MOD", [
+    "POP  X0",
+    "POP  X1",
+    "UDIV X2, X1, X0",
+    "MUL  X3, X0, X2",
+    "SUB  X0, X1, X3",
+    "PUSH X0",
+    "NEXT"
+])
+
+# /MOD ( a b -- c d ) where c = a MOD b and d=a/b
+prev = mkcode("/MOD", "DIVMOD", [
+    "POP  X0",                  # X0 = b
+    "POP  X1",                  # X1 = a
+    "UDIV X2, X1, X0",          # X2 = a/b
+    "MUL  X3, X0, X2",          # X3 = b*(a/b)
+    "SUB  X0, X1, X3",          # X0 = a - b*(a/b)
+    "PUSH X0",                  # push remainder
+    "PUSH X2",                  # push quotient
+    "NEXT" ])
+
 prev = mkcode("1+", "INCR", ["POP X0", "ADD X0, X0, #1", "PUSH X0", "NEXT"])
 prev = mkcode("1-", "DECR", ["POP X0", "SUB X0, X0, #1", "PUSH X0", "NEXT"])
 
@@ -114,6 +151,8 @@ prev = mkcode("-ROT", "NROT", [  # rotate top 3 stack items ( a b c -- c a b )
 prev = mkcode("DROP", "DROP", ["POP X0", "NEXT"])
 prev = mkcode("2DROP", "TWODROP", ["POP X0", "POP X0", "NEXT"])
 prev = mkcode("SWAP", "SWAP", ["POP X0", "POP X1", "PUSH X0", "PUSH X1", "NEXT"])
+
+# ( a b -- a b a )
 prev = mkcode("OVER", "OVER", ["POP X0", "POP X1", "PUSH X1", "PUSH X0", "PUSH X1", "NEXT"])
 #prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "BL _CR", "NEXT"])
 prev = mkcode(".", "DOT", ["POP X0", "BL printhex", "NEXT"])
@@ -124,6 +163,15 @@ prev = mkcode("INCR8", "INCR8", ["POP X0", "ADD X0, X0, #8", "PUSH X0", "NEXT"])
 
 prev = mkcode(">R", "TOR", ["POP X0", "PUSHRSP X0", "NEXT"])
 prev = mkcode("R>", "FROMR", ["POPRSP X0", "PUSH X0", "NEXT"])
+
+# push top of return stack
+prev = mkcode("R->1", "RGET1", ["LDR X0, [X9]", "PUSH X0", "NEXT" ])
+# push 2nd item of return stack
+prev = mkcode("R->2", "RGET2", ["LDR X0, [X9, #M_STACKITEMSIZE]", "PUSH X0", "NEXT" ])
+# push 3rd item of return stack
+prev = mkcode("R->3", "RGET3", ["LDR X0, [X9, #M_STACKITEMSIZE+M_STACKITEMSIZE]", "PUSH X0", "NEXT" ])
+
+
 
 prev = mkcode("RSP!", "RSPSTORE", ["POP X9", "NEXT"])
 prev = mkcode("RSP@", "RSPFETCH", ["PUSH X9", "NEXT"])
@@ -401,16 +449,6 @@ prev = mkcode("0BRANCH", "ZBRANCH", [
     "LDR  X0, [X8], #8",        # otherwise, skip the offset
     "NEXT" ])
 
-# /MOD ( a b -- c d ) where c = a%b and d=a/b
-prev = mkcode("/MOD", "DIVMOD", [
-    "POP  X0",                  # X0 = b
-    "POP  X1",                  # X1 = a
-    "UDIV X2, X1, X0",          # X2 = a/b
-    "MUL  X3, X0, X2",          # X3 = b*(a/b)
-    "SUB  X0, X1, X3",          # X0 = a - b*(a/b)
-    "PUSH X0",                  # push remainder
-    "PUSH X2",                  # push quotient
-    "NEXT" ])
 
 # RND ( -- n ) generate a 64-bit random number
 prev = mkcode("RND", "RND", [

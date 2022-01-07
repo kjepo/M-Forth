@@ -175,6 +175,13 @@ Algol: `DO` *loop-part* `WHILE` *condition*
   UNTIL         ( until n=0 )
 ;
 ```
+This is compiled to
+```
+        ,-----------------------------.
+        V                              \
+: SPACES SPACE -1 + DUP 0 = 0BRANCH ( -72 ) :
+
+```
 
 ### `BEGIN` *loop-part* `AGAIN`
 
@@ -299,4 +306,7 @@ with the core interpreter.
 
 # Things to do (unsorted)
 
+- `DO` ... `LOOP` with `LEAVE`, `CONTINUE` and `I` inside the body
+- A variable, like `BASE` for case sensitivity, so we can write `dup` as well as `DUP`.
 - Documentation
+- `:NONAME` doesn't seem to work
