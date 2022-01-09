@@ -24,7 +24,7 @@
 : LITERAL IMMEDIATE
   ' LIT ,
   ,
-  ;
+;
 
 : ':' [ CHAR : ] LITERAL ;
 : ';' [ CHAR : ] LITERAL ;
@@ -119,7 +119,7 @@
 \ FORTH: BEGIN <loop-part> <condition> UNTIL
 \
 \ Example:
-\ : SPACES	( n -- )
+\ : SPACES      ( n -- )
 \   BEGIN SPACE -1 + DUP 0 = UNTIL
 \ ;
 \       ,---------------------------.
@@ -331,11 +331,11 @@
 ( This is the underlying recursive definition of U. )
 : U.              ( u -- )
   BASE @ /MOD     ( width rem quot )
-	?DUP IF         ( if quotient <> 0 then )
+        ?DUP IF         ( if quotient <> 0 then )
     RECURSE       ( print the quotient )
   THEN
 
-	( print the remainder )
+        ( print the remainder )
   DUP 10 < IF
     '0'           ( decimal digits 0..9 )
   ELSE
@@ -428,7 +428,7 @@
 )
 
 : .S
-  S0 @		  ( start at bottom of stack )
+  S0 @            ( start at bottom of stack )
   __STACKITEMSIZE -
   BEGIN
     DUP DSP@ __STACKITEMSIZE + >
@@ -471,8 +471,8 @@
 ( ALIGNED takes an address and rounds it up (aligns it)
   to the next byte boundary )
 : ALIGNED         ( addr -- addr )
-  7 + 
-  7 INVERT AND   ( (addr+7) & ~7 )
+  __WORDSIZE1 + 
+  __WORDSIZE1 INVERT AND       ( (addr+7) & ~7 )
 ;
 
 ( ALIGN aligns the HERE pointer, so the next word appended will be aligned )
@@ -612,12 +612,12 @@
   WORD [TEN] CREATE (where [TEN] means that "TEN" is the next word in the
   input) leaves the dictionary entry:
 
-				   +--- HERE
-				   |
-				   V
-	+---------+---+---+---+---+
-	| LINK    | 3 | T | E | N |
-	+---------+---+---+---+---+
+                                   +--- HERE
+                                   |
+                                   V
+        +---------+---+---+---+---+
+        | LINK    | 3 | T | E | N |
+        +---------+---+---+---+---+
                    len
 
   For CONSTANT we can continue by appending DOCOL (the codeword), then LIT
@@ -639,7 +639,7 @@
 
 : CONSTANT
   WORD            ( get the name that follows CONSTANT )          
-  CREATE       	  ( make the dictionary entry )
+  CREATE          ( make the dictionary entry )
   DOCOL ,         ( append DOCOL, the codeword field of this word )
   ' LIT ,         ( append the codeword LIT )
   ,               ( append the value on top of the stack )
@@ -671,13 +671,13 @@
   to store anything we want, so one possible definition of VARIABLE might
   create this:
 
-	   ,----------------------------------------------.
-	   |					          |
-	   V					          |
-	+-------+------+---+---+---+---+--------+-----+---|--------+------+
-	| <var> | LINK | 3 | V | A | R | DOCOL  | LIT | <addr var> | EXIT |
-	+-------+------+---+---+---+---+--------+-----+------------+------+
-        		len             codeword
+           ,----------------------------------------------.
+           |                                              |
+           V                                              |
+        +-------+------+---+---+---+---+--------+-----+---|--------+------+
+        | <var> | LINK | 3 | V | A | R | DOCOL  | LIT | <addr var> | EXIT |
+        +-------+------+---+---+---+---+--------+-----+------------+------+
+                        len             codeword
 
   where <var> is the place to store the variable, and <addr var> points
   back to it.
@@ -692,7 +692,7 @@
 )
 
 : ALLOT          ( n -- addr )
-  HERE @ SWAP	 ( here n )
+  HERE @ SWAP    ( here n )
   HERE +!        ( adds n to HERE )
                  ( after this the old value of HERE is still on the stack )
 ;
@@ -712,12 +712,12 @@
 )
 
 : VARIABLE
-  1 CELLS ALLOT	( allocate 1 cell of memory, push the pointer to this memory )
-  WORD CREATE	( make the dictionary entry (the name follows VARIABLE) )
+  1 CELLS ALLOT ( allocate 1 cell of memory, push the pointer to this memory )
+  WORD CREATE   ( make the dictionary entry (the name follows VARIABLE) )
   DOCOL ,       ( append DOCOL (the codeword field of this word) )
   ' LIT ,       ( append the codeword LIT )
-  ,		( append the pointer to the new memory )
-  ' EXIT ,	( append the codeword EXIT )
+  ,             ( append the pointer to the new memory )
+  ' EXIT ,      ( append the codeword EXIT )
 ;
 
 VARIABLE X
@@ -734,10 +734,10 @@ VARIABLE X
  use them when you want a variable which is read often, and written
  infrequently.
 
-	20 VALUE VAL 	creates VAL with initial value 20
-	VAL		pushes the value (20) directly on the stack
-	30 TO VAL	updates VAL, setting it to 30
-	VAL		pushes the value (30) directly on the stack
+        20 VALUE VAL    creates VAL with initial value 20
+        VAL             pushes the value (20) directly on the stack
+        30 TO VAL       updates VAL, setting it to 30
+        VAL             pushes the value (30) directly on the stack
 
  Notice that 'VAL' on its own doesn't return the address of the value, but
  the value itself, making values simpler and more obvious to use than
@@ -750,17 +750,17 @@ VARIABLE X
  search each time. But because this is FORTH we have complete control of the
  compiler so we can compile TO more efficiently, turning:
 
-		TO VAL
+                TO VAL
  into:
-		LIT <addr> !
+                LIT <addr> !
 
  and calculating <addr> (the address of the value) at compile time.
 
  Now this is the clever bit.  We'll compile our value like this:
 
-	+------+---+---+---+---+----------+------+---------+--------+
-	| LINK | 3 | V | A | L | DOCOL    | LIT  | <value> | EXIT   |
-	+------+---+---+---+---+----------+------+---------+--------+
+        +------+---+---+---+---+----------+------+---------+--------+
+        | LINK | 3 | V | A | L | DOCOL    | LIT  | <value> | EXIT   |
+        +------+---+---+---+---+----------+------+---------+--------+
                 len              codeword
 
  where <value> is the actual value itself.  Note that when VAL
@@ -788,41 +788,41 @@ VARIABLE X
 )
 
 ( <value> VALUE <value-name>  creates <value-name> with initial <value> )
-: VALUE		( n -- )
-  WORD CREATE	( make the dictionary entry (the name follows VALUE) )
+: VALUE         ( n -- )
+  WORD CREATE   ( make the dictionary entry (the name follows VALUE) )
   DOCOL ,       ( append DOCOL )
   ' LIT ,       ( append the codeword LIT )
-  ,		( append the initial value )
-  ' EXIT ,	( append the codeword EXIT )
+  ,             ( append the initial value )
+  ' EXIT ,      ( append the codeword EXIT )
 ;
 
 ( <value> TO <value-name> stores <value> in <value-name> )
-: TO IMMEDIATE	( n -- )
+: TO IMMEDIATE  ( n -- )
   WORD          ( get the name of the value )
   FIND          ( look it up in the dictionary )
-  >DFA		( get a pointer to the first data field (the 'LIT') )
+  >DFA          ( get a pointer to the first data field (the 'LIT') )
   __WORDSIZE +  ( increment to point at the value )
-  STATE @ IF	( compiling? )
+  STATE @ IF    ( compiling? )
     ' LIT ,     ( compile LIT )
-    ,		( compile the address of the value )
+    ,           ( compile the address of the value )
     ' ! ,       ( compile ! )
-  ELSE		( immediate mode )
-    !		( update it straightaway )
+  ELSE          ( immediate mode )
+    !           ( update it straightaway )
   THEN
 ;
 
 ( <value> +TO <value-name>  adds <value> to <value-name> )
 : +TO IMMEDIATE
   WORD          ( get the name of the value )
-  FIND		( look it up in the dictionary )
-  >DFA		( get a pointer to the first data field (the 'LIT') )
+  FIND          ( look it up in the dictionary )
+  >DFA          ( get a pointer to the first data field (the 'LIT') )
   __WORDSIZE +  ( increment to point at the value )
-  STATE @ IF	( compiling? )
-    ' LIT ,	( compile LIT )
-    ,		( compile the address of the value )
-    ' +! ,	( compile +! )
-  ELSE		( immediate mode )
-    +!		( update it straightaway )
+  STATE @ IF    ( compiling? )
+    ' LIT ,     ( compile LIT )
+    ,           ( compile the address of the value )
+    ' +! ,      ( compile +! )
+  ELSE          ( immediate mode )
+    +!          ( update it straightaway )
   THEN
 ;
 
@@ -844,9 +844,9 @@ VARIABLE X
  defined.
 )
 : ID.
-  __WORDSIZE +	( skip over the link pointer )
+  __WORDSIZE +  ( skip over the link pointer )
   DUP C@        ( get the flags/length byte )
-  F_LENMASK AND	( mask out the flags - just want the length )
+  F_LENMASK AND ( mask out the flags - just want the length )
  
   BEGIN
     DUP 0>      ( length > 0? )
@@ -856,28 +856,28 @@ VARIABLE X
     EMIT        ( len addr char -- len addr | and print it)
     SWAP 1-     ( len addr -- addr len-1    | subtract one from length )
  REPEAT
- 2DROP		( len addr -- )
+ 2DROP          ( len addr -- )
 ;
 
 : TEST#-11
   WORD          ( get the name of the value )
-  FIND		( look it up in the dictionary )
+  FIND          ( look it up in the dictionary )
   ID.
 ;
-\ TEST#-11 DUP
+\TEST#-11 DUP
 
 ( WORD word FIND ?HIDDEN  returns true if 'word' is flagged as hidden. )
 : ?HIDDEN
-  __WORDSIZE +	( skip over the link pointer )
-  C@		( get the flags/length byte )
-  F_HIDDEN AND	( mask the F_HIDDEN flag and return it (as a truth value) )
+  __WORDSIZE +  ( skip over the link pointer )
+  C@            ( get the flags/length byte )
+  F_HIDDEN AND  ( mask the F_HIDDEN flag and return it (as a truth value) )
 ;
 
 ( WORD word FIND ?IMMEDIATE  returns true if 'word' is flagged as immediate. )
 : ?IMMEDIATE
-  __WORDSIZE +	( skip over the link pointer )
-  C@		( get the flags/length byte )
-  F_IMMED AND	( mask the F_IMMED flag and return it (as a truth value) )
+  __WORDSIZE +  ( skip over the link pointer )
+  C@            ( get the flags/length byte )
+  F_IMMED AND   ( mask the F_IMMED flag and return it (as a truth value) )
 ;
 
 ( WORDS prints all the words defined in the dictionary, starting with the
@@ -886,15 +886,15 @@ VARIABLE X
   pointers. )
 
 : WORDS
-  LATEST @	        ( start at LATEST dictionary entry )
+  LATEST @              ( start at LATEST dictionary entry )
   BEGIN
-    ?DUP		( while link pointer is not null )
+    ?DUP                ( while link pointer is not null )
   WHILE
-    DUP ?HIDDEN NOT IF	( ignore hidden words )
-      DUP ID.		( but if not hidden, print the word )
+    DUP ?HIDDEN NOT IF  ( ignore hidden words )
+      DUP ID.           ( but if not hidden, print the word )
       SPACE
     THEN
-    @		        ( dereference the link pointer - go to previous word )
+    @                   ( dereference the link pointer - go to previous word )
   REPEAT
   CR
 ;
@@ -923,9 +923,9 @@ VARIABLE X
 )
 
 : FORGET
-  WORD FIND		( find the word, gets the dictionary entry address )
-  DUP @ LATEST !	( set LATEST to point to the previous word )
-  HERE !		( and store HERE with the dictionary address )
+  WORD FIND             ( find the word, gets the dictionary entry address )
+  DUP @ LATEST !        ( set LATEST to point to the previous word )
+  HERE !                ( and store HERE with the dictionary address )
 ;
 
 ( -------------------- DUMP --------------------
@@ -939,56 +939,56 @@ VARIABLE X
   You can dump out the raw code for the last word you defined by doing
   something like:
 
-		LATEST @ 128 DUMP
+                LATEST @ 128 DUMP
 )
 
-: DUMP			( addr len -- )
-  BASE @ -ROT		( save the current BASE at the bottom of the stack )
-  HEX  	 		( and switch to hexadecimal mode )
+: DUMP                  ( addr len -- )
+  BASE @ -ROT           ( save the current BASE at the bottom of the stack )
+  HEX                   ( and switch to hexadecimal mode )
   BEGIN
-    ?DUP		( while len > 0 )
+    ?DUP                ( while len > 0 )
   WHILE
-    OVER 8 U.R		( print the address )
+    OVER 8 U.R          ( print the address )
     SPACE
 
     ( print up to 16 words on this line )
-    2DUP		( addr len addr len )
-    1- 15 AND 1+	( addr len addr linelen )
+    2DUP                ( addr len addr len )
+    1- 15 AND 1+        ( addr len addr linelen )
     BEGIN
-      ?DUP		( while linelen > 0 )
+      ?DUP              ( while linelen > 0 )
     WHILE
-      SWAP		( addr len linelen addr )
-      DUP C@		( addr len linelen addr byte )
-      2 .R SPACE	( print the byte )
-      1+ SWAP 1-	( addr len linelen addr -- addr len addr+1 linelen-1 )
+      SWAP              ( addr len linelen addr )
+      DUP C@            ( addr len linelen addr byte )
+      2 .R SPACE        ( print the byte )
+      1+ SWAP 1-        ( addr len linelen addr -- addr len addr+1 linelen-1 )
     REPEAT
-    DROP		( addr len )
+    DROP                ( addr len )
 
     ( print the ASCII equivalents )
     2DUP 1- 15 AND 1+   ( addr len addr linelen )
     BEGIN
-      ?DUP		( while linelen > 0)
+      ?DUP              ( while linelen > 0)
     WHILE
-      SWAP		( addr len linelen addr )
-      DUP C@		( addr len linelen addr byte )
-      DUP 32 128 WITHIN IF	( 32 <= c < 128? )
+      SWAP              ( addr len linelen addr )
+      DUP C@            ( addr len linelen addr byte )
+      DUP 32 128 WITHIN IF      ( 32 <= c < 128? )
         EMIT
       ELSE
         DROP '.' EMIT
       THEN
-      1+ SWAP 1-	( addr len linelen addr -- addr len addr+1 linelen-1 )
+      1+ SWAP 1-        ( addr len linelen addr -- addr len addr+1 linelen-1 )
     REPEAT
-    DROP		( addr len )
+    DROP                ( addr len )
     CR
 
     DUP 1- 15 AND 1+    ( addr len linelen )
-    TUCK		( addr linelen len linelen )
-    -		        ( addr linelen len-linelen )
-    >R + R>		( addr+linelen len-linelen )
+    TUCK                ( addr linelen len linelen )
+    -                   ( addr linelen len-linelen )
+    >R + R>             ( addr+linelen len-linelen )
   REPEAT
 
-  DROP			( restore stack )
-  BASE !		( restore saved BASE )
+  DROP                  ( restore stack )
+  BASE !                ( restore saved BASE )
 ;
 
 ( -------------------- CASE -------------------- 
@@ -997,13 +997,13 @@ VARIABLE X
   generally agreed syntax for this, so I've gone for the syntax
   mandated by the ISO standard FORTH (ANS-FORTH).
 
-		( some value on the stack )
-		CASE
-		test1 OF ... ENDOF
-		test2 OF ... ENDOF
-		testn OF ... ENDOF
-		... ( default case )
-		ENDCASE
+                ( some value on the stack )
+                CASE
+                test1 OF ... ENDOF
+                test2 OF ... ENDOF
+                testn OF ... ENDOF
+                ... ( default case )
+                ENDCASE
 
   The CASE statement tests the value on the stack by comparing it for
   equality with test1, test2, ..., testn and executes the matching
@@ -1042,12 +1042,12 @@ VARIABLE X
 
   The general plan is to compile the code as a series of IF statements:
 
-	CASE			(push 0 on the immediate-mode parameter stack)
-	test1 OF ... ENDOF	test1 OVER = IF DROP ... ELSE
-	test2 OF ... ENDOF	test2 OVER = IF DROP ... ELSE
-	testn OF ... ENDOF	testn OVER = IF DROP ... ELSE
-	... ( default case )	...
-	ENDCASE			DROP THEN [THEN [THEN ...]]
+        CASE                    (push 0 on the immediate-mode parameter stack)
+        test1 OF ... ENDOF      test1 OVER = IF DROP ... ELSE
+        test2 OF ... ENDOF      test2 OVER = IF DROP ... ELSE
+        testn OF ... ENDOF      testn OVER = IF DROP ... ELSE
+        ... ( default case )    ...
+        ENDCASE                 DROP THEN [THEN [THEN ...]]
 
   The CASE statement pushes 0 on the immediate-mode parameter stack,
   and that number is used to count how many THEN statements we need
@@ -1068,22 +1068,22 @@ VARIABLE X
 )
 
 : CASE IMMEDIATE
-  0			( push 0 to mark the bottom of the stack )
+  0                     ( push 0 to mark the bottom of the stack )
 ;
 
 : OF IMMEDIATE
-  ' OVER ,		( compile OVER )
-  ' = ,			( compile = )
-  [COMPILE] IF		( compile IF )
-  ' DROP ,  		( compile DROP )
+  ' OVER ,              ( compile OVER )
+  ' = ,                 ( compile = )
+  [COMPILE] IF          ( compile IF )
+  ' DROP ,              ( compile DROP )
 ;
 
 : ENDOF IMMEDIATE
-  [COMPILE] ELSE	( ENDOF is the same as ELSE )
+  [COMPILE] ELSE        ( ENDOF is the same as ELSE )
 ;
 
 : ENDCASE IMMEDIATE
-  ' DROP ,		( compile DROP )
+  ' DROP ,              ( compile DROP )
 
   ( keep compiling THEN until we get to our zero marker )
   BEGIN
@@ -1126,19 +1126,19 @@ VARIABLE X
   This word returns 0 if it doesn't find a match.
 )
 : CFA>
-  LATEST @	( start at LATEST dictionary entry )
+  LATEST @      ( start at LATEST dictionary entry )
   BEGIN
-    ?DUP		( while link pointer is not null )
+    ?DUP                ( while link pointer is not null )
   WHILE
-    2DUP SWAP	( cfa curr curr cfa )
-    < IF		( current dictionary entry < cfa? )
-      NIP		( leave curr dictionary entry on the stack )
+    2DUP SWAP   ( cfa curr curr cfa )
+    < IF                ( current dictionary entry < cfa? )
+      NIP               ( leave curr dictionary entry on the stack )
       EXIT
     THEN
-    @		( follow link pointer back )
+    @           ( follow link pointer back )
   REPEAT
-  DROP		( restore stack )
-  0		( sorry, nothing found )
+  DROP          ( restore stack )
+  0             ( sorry, nothing found )
 ;
 
 ( SEE decompiles a FORTH word.
@@ -1160,86 +1160,86 @@ VARIABLE X
 
 )
 : SEE
-  WORD FIND	( find the dictionary entry to decompile )
+  WORD FIND     ( find the dictionary entry to decompile )
 
   ( Now we search again, looking for the next word in the dictionary.
     This gives us the length of the word that we will be decompiling.
     (Well, mostly it does). )
 
-  HERE @	( address of the end of the last compiled word )
-  LATEST @	( word last curr )
+  HERE @        ( address of the end of the last compiled word )
+  LATEST @      ( word last curr )
   BEGIN
-    2 PICK	( word last curr word )
-    OVER	( word last curr word curr )
-    <>		( word last curr word<>curr? )
-  WHILE		( word last curr )
-    NIP		( word curr )
-    DUP @	( word curr prev (which becomes: word last curr) )
+    2 PICK      ( word last curr word )
+    OVER        ( word last curr word curr )
+    <>          ( word last curr word<>curr? )
+  WHILE         ( word last curr )
+    NIP         ( word curr )
+    DUP @       ( word curr prev (which becomes: word last curr) )
   REPEAT
 
-  DROP		( at this point, the stack is: start-of-word end-of-word )
-  SWAP		( end-of-word start-of-word )
+  DROP          ( at this point, the stack is: start-of-word end-of-word )
+  SWAP          ( end-of-word start-of-word )
 
   ( begin the definition with : NAME [IMMEDIATE] )
   ':' EMIT SPACE DUP ID. SPACE
   DUP ?IMMEDIATE IF ." IMMEDIATE " THEN
 
   ( get the data address, ie. points after DOCOL | end-of-word start-of-data )
-  >DFA	
+  >DFA  
 
   ( now we start decompiling until we hit the end of the word )
-  BEGIN		 	     	( end start )
+  BEGIN                         ( end start )
     2DUP >
   WHILE
-    DUP @			( end start codeword )
+    DUP @                       ( end start codeword )
  
     CASE
-    ' LIT OF			( is it LIT ? )
-      __WORDSIZE + DUP @ 	( get next word which is the integer constant )
-      .		        	( and print it )
+    ' LIT OF                    ( is it LIT ? )
+      __WORDSIZE + DUP @        ( get next word which is the integer constant )
+      .                         ( and print it )
     ENDOF
-    ' LITSTRING OF		( is it LITSTRING ? )
+    ' LITSTRING OF              ( is it LITSTRING ? )
       [ CHAR S ] LITERAL EMIT '"' EMIT SPACE ( print S"<space> )
-      __WORDSIZE + DUP @      	( get the length word )
-      SWAP __WORDSIZE + SWAP	( end start+WORDSIZE length )
-      2DUP TELL			( print the string )
-      '"' EMIT SPACE		( finish the string with a final quote )
-      + ALIGNED			( end start+4+len, aligned )
-      __WORDSIZE -		( because we're about to add 4 below )
+      __WORDSIZE + DUP @        ( get the length word )
+      SWAP __WORDSIZE + SWAP    ( end start+WORDSIZE length )
+      2DUP TELL                 ( print the string )
+      '"' EMIT SPACE            ( finish the string with a final quote )
+      + ALIGNED                 ( end start+4+len, aligned )
+      __WORDSIZE -              ( because we're about to add 4 below )
     ENDOF
-    ' 0BRANCH OF		( is it 0BRANCH ? )
+    ' 0BRANCH OF                ( is it 0BRANCH ? )
       ." 0BRANCH ( "
-      __WORDSIZE + DUP @	( print the offset )
+      __WORDSIZE + DUP @        ( print the offset )
       .
       ." ) "
     ENDOF
-    ' BRANCH OF		( is it BRANCH ? )
+    ' BRANCH OF         ( is it BRANCH ? )
       ." BRANCH ( "
-      __WORDSIZE + DUP @	( print the offset )
+      __WORDSIZE + DUP @        ( print the offset )
       .
       ." ) "
      ENDOF
-     ' ' OF			( is it ' (TICK) ? )
+     ' ' OF                     ( is it ' (TICK) ? )
        [ CHAR ' ] LITERAL EMIT SPACE
-       __WORDSIZE + DUP @	( get the next codeword )
-       CFA>		   ( and force it to be printed as a dictionary entry )
+       __WORDSIZE + DUP @       ( get the next codeword )
+       CFA>                ( and force it to be printed as a dictionary entry )
        ID. SPACE
      ENDOF
-     ' EXIT OF			( is it EXIT? )
+     ' EXIT OF                  ( is it EXIT? )
 
      ( We expect the last word to be EXIT, and if it is then we don't print
        it because EXIT is normally implied by ;.  EXIT can also appear in
        the middle of words, and then it needs to be printed. )
 
-       2DUP	     	    	( end start end start )
-       __WORDSIZE +	  	( end start end start+4 )
-       <> IF	  		( end start | we're not at the end )
+       2DUP                     ( end start end start )
+       __WORDSIZE +             ( end start end start+4 )
+       <> IF                    ( end start | we're not at the end )
          ." EXIT "
        THEN
      ENDOF
-		  ( default case: )
-       DUP	  ( in the default case we always need to DUP before using )
-       CFA>	  ( look up the codeword to get the dictionary entry )
+                  ( default case: )
+       DUP        ( in the default case we always need to DUP before using )
+       CFA>       ( look up the codeword to get the dictionary entry )
        ID. SPACE  ( and print it )
      ENDCASE
 
@@ -1276,14 +1276,14 @@ VARIABLE X
   the stack where foo is the next word in input.  So a very slow way
   to run DOUBLE might be:
 
-		: DOUBLE DUP + ;
-		: SLOW WORD FIND >CFA EXECUTE ;
-		5 SLOW DOUBLE . CR	\ prints 10
+                : DOUBLE DUP + ;
+                : SLOW WORD FIND >CFA EXECUTE ;
+                5 SLOW DOUBLE . CR      \ prints 10
 
   We also offer a simpler and faster way to get the execution token of
   any word FOO:
 
-		['] FOO
+                ['] FOO
 
   Exercises for readers:
   (1) What is the difference between ['] FOO and ' FOO?
@@ -1297,15 +1297,15 @@ VARIABLE X
 
   as in this example:
 
-      :NONAME ." anon word was called" CR ;	\ pushes xt on the stack
-      DUP EXECUTE EXECUTE			\ executes the anon word twice
+      :NONAME ." anon word was called" CR ;     \ pushes xt on the stack
+      DUP EXECUTE EXECUTE                       \ executes the anon word twice
 
   Stack parameters work as expected:
 
       :NONAME ." called with parameter " . CR ;
       DUP
-      10 SWAP EXECUTE		\ prints 'called with parameter 10'
-      20 SWAP EXECUTE		\ prints 'called with parameter 20'
+      10 SWAP EXECUTE           \ prints 'called with parameter 10'
+      20 SWAP EXECUTE           \ prints 'called with parameter 20'
 
   Notice that the above code has a memory leak: the anonymous word is
   still compiled into the data segment, so even if you lose track of
@@ -1326,39 +1326,39 @@ VARIABLE X
       : SET-CMD CELLS CMD-TABLE + ! ;
       : CALL-CMD CELLS CMD-TABLE + @ EXECUTE ;
 
-      :NONAME ." alternate 0 was called" CR ;	 0 SET-CMD
-      :NONAME ." alternate 1 was called" CR ;	 1 SET-CMD
+      :NONAME ." alternate 0 was called" CR ;    0 SET-CMD
+      :NONAME ." alternate 1 was called" CR ;    1 SET-CMD
       \ etc...
-      :NONAME ." alternate 9 was called" CR ;	 9 SET-CMD
+      :NONAME ." alternate 9 was called" CR ;    9 SET-CMD
  
       0 CALL-CMD
       1 CALL-CMD
 )
 
 : :NONAME
-  0 0 CREATE	( create a word with no name - we need a dictionary
+  0 0 CREATE    ( create a word with no name - we need a dictionary
                   header because ; expects it )
-  HERE @	( current HERE value is the address of the codeword,
-       		  ie. the xt )
-  DOCOL ,	( compile DOCOL (the codeword) )
-  ]		( go into compile mode )
+  HERE @        ( current HERE value is the address of the codeword,
+                  ie. the xt )
+  DOCOL ,       ( compile DOCOL (the codeword) )
+  ]             ( go into compile mode )
 ;
 
 : ['] IMMEDIATE
-  ' LIT ,		( compile LIT )
+  ' LIT ,               ( compile LIT )
 ;
 
 ( Example: 10 TIMES SPACE  calls SPACE 10 times )
 : TIMES 
-  WORD FIND >CFA	( get xt for next word )
+  WORD FIND >CFA        ( get xt for next word )
   BEGIN
     OVER 0>             ( xt n )
   WHILE                 ( n xt )
-    DUP 		( n xt xt )
-    EXECUTE		( n xt )
-    SWAP		( xt n  )
-    1-			( xt n-1 )
-    SWAP		( n-1 xt )
+    DUP                 ( n xt xt )
+    EXECUTE             ( n xt )
+    SWAP                ( xt n  )
+    1-                  ( xt n-1 )
+    SWAP                ( n-1 xt )
   REPEAT
 ;
   
@@ -1381,7 +1381,7 @@ VARIABLE X
         ?DUP IF
           ." called FOO and it threw exception number: "
           . CR
-          DROP		     \ we have to drop the argument of FOO (25)
+          DROP               \ we have to drop the argument of FOO (25)
         THEN
       ;
       \ prints: called FOO and it threw exception number: 25
@@ -1426,7 +1426,7 @@ VARIABLE X
   When called, THROW walks up the return stack (the process is called
   'unwinding') until it finds the exception stack frame.  It then uses the
   data in the exception stack frame to restore the state allowing execution to
-  continue after the matching CATCH.  (If it	unwinds the stack and doesn't
+  continue after the matching CATCH.  (If it    unwinds the stack and doesn't
   find the exception stack frame then it prints a message and drops back to the
   prompt, which is also normal behaviour for so-called 'uncaught exceptions').
 
@@ -1465,40 +1465,40 @@ VARIABLE X
 )
 
 : EXCEPTION-MARKER
-  RDROP		( drop the original parameter stack pointer )
-  0		( there was no exception, this is the normal return path )
+  RDROP         ( drop the original parameter stack pointer )
+  0             ( there was no exception, this is the normal return path )
 ;
 
-: CATCH		( xt -- exn? )
+: CATCH         ( xt -- exn? )
   ( save parameter stack pointer (+ 16 because of xt) on return stack )
-  DSP@ __STACKITEMSIZE + >R	
+  DSP@ __STACKITEMSIZE + >R     
   ( push the address of the RDROP inside EXCEPTION-MARKER ... )
   ' EXCEPTION-MARKER __STACKITEMSIZE +
   ( ... on to the return stack so it acts like a return address )  
-  >R		
-  EXECUTE	( execute the nested function )
+  >R            
+  EXECUTE       ( execute the nested function )
 ;
 
-: THROW		( n -- )
-  ?DUP IF	( only act if the exception code <> 0 )
-    RSP@ 	( get return stack pointer )
+: THROW         ( n -- )
+  ?DUP IF       ( only act if the exception code <> 0 )
+    RSP@        ( get return stack pointer )
     BEGIN
-      DUP R0 __STACKITEMSIZE - <	( RSP < R0 )
+      DUP R0 __STACKITEMSIZE - <        ( RSP < R0 )
     WHILE
-      DUP @		( get the return stack entry )
+      DUP @             ( get the return stack entry )
       ( found the EXCEPTION-MARKER on the return stack )
-      ' EXCEPTION-MARKER __STACKITEMSIZE + = IF	
-        __STACKITEMSIZE +	( skip the EXCEPTION-MARKER on the return stack )
-        RSP!	( restore the return stack pointer )
+      ' EXCEPTION-MARKER __STACKITEMSIZE + = IF 
+        __STACKITEMSIZE +       ( skip the EXCEPTION-MARKER on the return stack )
+        RSP!    ( restore the return stack pointer )
 
         ( Restore the parameter stack. )
         DUP DUP DUP
         ( reserve some working space so the stack for this word
         doesn't coincide with the part of the stack being restored )
-        R>	( get the saved parameter stack pointer | n dsp )
-        __STACKITEMSIZE -	( reserve space on the stack to store n )
-        SWAP OVER	( dsp n dsp )
-        !		( write n on the stack )
+        R>      ( get the saved parameter stack pointer | n dsp )
+        __STACKITEMSIZE -       ( reserve space on the stack to store n )
+        SWAP OVER       ( dsp n dsp )
+        !               ( write n on the stack )
         DSP! EXIT ( restore the parameter stack pointer, immediately exit )
       THEN
       __STACKITEMSIZE +
@@ -1508,7 +1508,7 @@ VARIABLE X
     DROP
 
     CASE
-    0 1- OF	( ABORT )
+    0 1- OF     ( ABORT )
       ." ABORTED" CR
     ENDOF
       ( default case )
@@ -1519,34 +1519,34 @@ VARIABLE X
   THEN
 ;
 
-: ABORT		( -- )
+: ABORT         ( -- )
   0 1- THROW
 ;
 
 ( Print a stack trace by walking up the return stack. )
 : PRINT-STACK-TRACE
-  RSP@			( start at caller of this function )
+  RSP@                  ( start at caller of this function )
   BEGIN
-    DUP R0 __STACKITEMSIZE - <	( RSP < R0 )
+    DUP R0 __STACKITEMSIZE - <  ( RSP < R0 )
   WHILE
-    DUP @		( get the return stack entry )
+    DUP @               ( get the return stack entry )
     CASE
-    ' EXCEPTION-MARKER __STACKITEMSIZE + OF	( is it the exception stack frame? )
+    ' EXCEPTION-MARKER __STACKITEMSIZE + OF     ( is it the exception stack frame? )
       ." CATCH ( DSP="
-      __STACKITEMSIZE + DUP @ U.	  ( print saved stack pointer )
+      __STACKITEMSIZE + DUP @ U.          ( print saved stack pointer )
       ." ) "
     ENDOF
       ( default case )
       DUP
-      CFA>		  ( look up the codeword to get the dictionary entry )
-      ?DUP IF		  ( and print it )
-        2DUP		  ( dea addr dea )
-        ID.		  ( print word from dictionary entry )
+      CFA>                ( look up the codeword to get the dictionary entry )
+      ?DUP IF             ( and print it )
+        2DUP              ( dea addr dea )
+        ID.               ( print word from dictionary entry )
         [ CHAR + ] LITERAL EMIT
         SWAP >DFA __STACKITEMSIZE + - . ( print offset )
       THEN
     ENDCASE
-    __STACKITEMSIZE +			  ( move up the stack )
+    __STACKITEMSIZE +                     ( move up the stack )
   REPEAT
   DROP
   CR
@@ -1555,11 +1555,11 @@ VARIABLE X
 : FOO ( n -- ) THROW ;
 
 : TEST-EXCEPTIONS
- 25 ['] FOO CATCH	\ execute 25 FOO, catching any exception
+ 25 ['] FOO CATCH       \ execute 25 FOO, catching any exception
  ?DUP IF
    ." called FOO and it threw exception number: "
    . CR
-   DROP		\ we have to drop the argument of FOO (25)
+   DROP         \ we have to drop the argument of FOO (25)
  THEN
 ;
 
@@ -1584,11 +1584,11 @@ VARIABLE X
   C -> FORTH          c-addr    addr len   DUP STRLEN
 
   FORTH -> C          addr len  c-addr     CSTRING     Allocated in a
-  	   	      	   		   	       temporary buffer,
-						       so should be consumed
-						       or copied immediately.
- 						       FORTH string should
-						       not contain NULs.
+                                                       temporary buffer,
+                                                       so should be consumed
+                                                       or copied immediately.
+                                                       FORTH string should
+                                                       not contain NULs.
 
   For example, DUP STRLEN TELL prints a C string.
 )
@@ -1604,62 +1604,62 @@ VARIABLE X
 )
 
 : Z" IMMEDIATE
-  STATE @ IF		( compiling? )
-    ' LITSTRING ,	( compile LITSTRING )
-    HERE @		( save the address of the length word on the stack )
-    0 ,			( dummy length - we don't know what it is yet )
+  STATE @ IF            ( compiling? )
+    ' LITSTRING ,       ( compile LITSTRING )
+    HERE @              ( save the address of the length word on the stack )
+    0 ,                 ( dummy length - we don't know what it is yet )
     BEGIN
-      KEY 		( get next character of the string )
+      KEY               ( get next character of the string )
       DUP '"' <>
     WHILE
-      HERE @ C!		( store the character in the compiled image )
-      1 HERE +!		( increment HERE pointer by 1 byte )
+      HERE @ C!         ( store the character in the compiled image )
+      1 HERE +!         ( increment HERE pointer by 1 byte )
     REPEAT
-    0 HERE @ C!		( add the ASCII NUL byte )
+    0 HERE @ C!         ( add the ASCII NUL byte )
     1 HERE +!
-    DROP		( drop the double quote character at the end )
-    DUP			( get the saved address of the length word )
-    HERE @ SWAP -	( calculate the length )
-    __WORDSIZE -	( subtract WORDSIZE ( because we measured 
+    DROP                ( drop the double quote character at the end )
+    DUP                 ( get the saved address of the length word )
+    HERE @ SWAP -       ( calculate the length )
+    __WORDSIZE -        ( subtract WORDSIZE ( because we measured 
                           from the start of the length word) )
-    SWAP !		( and back-fill the length location )
-    ALIGN		( round up to next multiple for the remaining code )
-    ' DROP ,		( compile DROP (to drop the length) )
-  ELSE			( immediate mode )
-    HERE @		( get the start address of the temporary space )
+    SWAP !              ( and back-fill the length location )
+    ALIGN               ( round up to next multiple for the remaining code )
+    ' DROP ,            ( compile DROP (to drop the length) )
+  ELSE                  ( immediate mode )
+    HERE @              ( get the start address of the temporary space )
     BEGIN
       KEY
       DUP '"' <>
     WHILE
-      OVER C!		( save next character )
-      1+		( increment address )
+      OVER C!           ( save next character )
+      1+                ( increment address )
     REPEAT
-    DROP		( drop the final " character )
-    0 SWAP C!		( store final ASCII NUL )
-    HERE @		( push the start address )
+    DROP                ( drop the final " character )
+    0 SWAP C!           ( store final ASCII NUL )
+    HERE @              ( push the start address )
   THEN
 ;
 
-: STRLEN		( str -- len )
-  DUP			( save start address )
+: STRLEN                ( str -- len )
+  DUP                   ( save start address )
   BEGIN
-    DUP C@ 0<>		( zero byte found? )
+    DUP C@ 0<>          ( zero byte found? )
   WHILE
     1+
   REPEAT
 
-  SWAP -		( calculate the length )
+  SWAP -                ( calculate the length )
 ;
 
-: CSTRING		( addr len -- c-addr )
-  SWAP OVER		( len saddr len )
-  HERE @ SWAP		( len saddr daddr len )
-  CMOVE			( len )
+: CSTRING               ( addr len -- c-addr )
+  SWAP OVER             ( len saddr len )
+  HERE @ SWAP           ( len saddr daddr len )
+  CMOVE                 ( len )
 
-  HERE @ +		( daddr+len )
-  0 SWAP C!		( store terminating NUL char )
+  HERE @ +              ( daddr+len )
+  0 SWAP C!             ( store terminating NUL char )
 
-  HERE @ 		( push start address )
+  HERE @                ( push start address )
 ;
 
 ( -------------------- THE ENVIRONMENT -------------------- 
@@ -1668,15 +1668,15 @@ VARIABLE X
 
   When _main is called by the _start function, 
   
-	X0 will contain argc
-	X1 will contain argv, a pointer to an array of pointers
-	X2 will contain envp,               - " -
+        X0 will contain argc
+        X1 will contain argv, a pointer to an array of pointers
+        X2 will contain envp,               - " -
 
   Each pointer in the array of pointers points to a C string (NULL-
   terminated array of bytes).  X0 tells how many pointers there are
   in the array of pointers pointed to by argv.
 
-     	argv[argc] is a NULL pointer.
+        argv[argc] is a NULL pointer.
 
   The first word that we define, ARGC, pushes the number of command
   line arguments (note that as with C argc, this includes the name of
@@ -1692,10 +1692,10 @@ VARIABLE X
   And to print the last argument you would do: ARGC 1- ARGV TELL CR
 )
 
-: ARGV			( n -- str u )
-  CELLS UNIX_ARGV @ +	( get the address of argv[n] entry )
-  @  	   	       	( get the address of the string )
-  DUP STRLEN		( and get its length / turn it into a FORTH string )
+: ARGV                  ( n -- str u )
+  CELLS UNIX_ARGV @ +   ( get the address of argv[n] entry )
+  @                     ( get the address of the string )
+  DUP STRLEN            ( and get its length / turn it into a FORTH string )
 ;
 
 ( ENVIRON returns the address of the first environment string.  
@@ -1705,7 +1705,7 @@ VARIABLE X
   ENVIRON @ DUP STRLEN TELL
 )
 
-: ENVIRON	( -- addr )
+: ENVIRON       ( -- addr )
   UNIX_ENVP @
 ;
 
@@ -1715,9 +1715,9 @@ VARIABLE X
 )
 
 ( BYE exits by calling doing the exit system call )
-: BYE		( -- )
-  0		( return code (0) )
-  SYS_EXIT	( system call number )
+: BYE           ( -- )
+  0             ( return code (0) )
+  SYS_EXIT      ( system call number )
   SYSCALL1
 ;
 
@@ -1749,64 +1749,64 @@ VARIABLE X
 ( Mystery: when openat(2) fails to find the file, it returns 2 rather than <0 )
 
 ( S" foo.txt" R/O OPEN-FILE )
-: OPEN-FILE		( addr u fam -- ... (see below) )
-  -ROT			( fam addr u )
-  CSTRING		( fam cstring )
-  AT_FDCWD   	        ( fam cstring AT_FDCWD )
+: OPEN-FILE             ( addr u fam -- ... (see below) )
+  -ROT                  ( fam addr u )
+  CSTRING               ( fam cstring )
+  AT_FDCWD              ( fam cstring AT_FDCWD )
   -ROT                  ( AT_FDCWD fam cstring )
-  SWAP			( AT_FDCWD cstring fam )
-  438  			( AT_FDCWD cstring fam S_RDWR )
-  SYS_OPENAT		( AT_FDCWD cstring fam S_RDWR sys_open )
+  SWAP                  ( AT_FDCWD cstring fam )
+  438                   ( AT_FDCWD cstring fam S_RDWR )
+  SYS_OPENAT            ( AT_FDCWD cstring fam S_RDWR sys_open )
   SYSCALL4
   ." After open system call: " .S CR
-  DUP			( fd fd )
-  DUP 0< IF		( errno? )
-    NEGATE		( fd errno, if there was an error )
+  DUP                   ( fd fd )
+  DUP 0< IF             ( errno? )
+    NEGATE              ( fd errno, if there was an error )
   ELSE
-    DROP 0		( fd 0, if successful )
+    DROP 0              ( fd 0, if successful )
   THEN
 ;
 
 ( S" foo.txt" R/W CREATE-FILE )
-: CREATE-FILE		( addr u fam -- ... (see below) )
+: CREATE-FILE           ( addr u fam -- ... (see below) )
   O_CREAT OR
-  O_TRUNC OR		( flags|O_TRUNC|O_CREAT )
+  O_TRUNC OR            ( flags|O_TRUNC|O_CREAT )
   DROP O_CREAT
-  -ROT			( fam addr u )
-  CSTRING		( fam cstring )
+  -ROT                  ( fam addr u )
+  CSTRING               ( fam cstring )
   SWAP                  ( cstring fam )
   420                   ( cstring fam 0644 )
   SYS_OPENAT            ( X0=cstring X1=fam X2=0644 X16=SYS_OPENAT )
-  SYSCALL3 	        ( open(filename, flags|O_TRUNC|O_CREAT, 0644) )
-  DUP			( fd fd )
-  DUP 0< IF		( errno? )
-    NEGATE		( fd errno )
+  SYSCALL3              ( open(filename, flags|O_TRUNC|O_CREAT, 0644) )
+  DUP                   ( fd fd )
+  DUP 0< IF             ( errno? )
+    NEGATE              ( fd errno )
   ELSE
-    DROP 0		( fd 0 )
+    DROP 0              ( fd 0 )
   THEN
 ;
 
-: CLOSE-FILE		( fd -- 0 (successful) | fd -- errno (error) )
+: CLOSE-FILE            ( fd -- 0 (successful) | fd -- errno (error) )
   SYS_CLOSE SYSCALL1
   NEGATE
 ;
 
-: READ-FILE		( addr u fd -- ... (see below) )
-  -ROT          	( fd addr u )
+: READ-FILE             ( addr u fd -- ... (see below) )
+  -ROT                  ( fd addr u )
   SWAP
-  SYS_READ		( fd addr u SYS_READ )
+  SYS_READ              ( fd addr u SYS_READ )
   SYSCALL3
-  DUP			( u2 u2 )
-  DUP 0< IF		( errno? )
-    NEGATE		( u2 errno )
+  DUP                   ( u2 u2 )
+  DUP 0< IF             ( errno? )
+    NEGATE              ( u2 errno )
   ELSE
-    DROP 0		( u2 0 )
+    DROP 0              ( u2 0 )
   THEN
 ;
   
 ( PERROR prints a message for an errno, similar to C's perror(3) but we don't have the extensive
   list of strerror strings available, so all we can do is print the errno. )
-: PERROR	( errno addr u -- )
+: PERROR        ( errno addr u -- )
   TELL
     ':' EMIT SPACE
     ." ERRNO="
@@ -1849,7 +1849,7 @@ VARIABLE FD
 
 ( -------------------- WELCOME MESSAGE -------------------- 
 
-	Print the version and OK prompt.
+        Print the version and OK prompt.
 )
 
 : WELCOME

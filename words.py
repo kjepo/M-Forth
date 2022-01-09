@@ -590,6 +590,7 @@ prev = mkword("QUIT", "QUIT", [
 prev = mkconstaddr("DOCOL", "__DOCOL", "DOCOL")
 prev = mkconstaddr("R0", "RZ", "return_stack_top")
 prev = mkconstint("__WORDSIZE", "__WORDSIZE", "M_WORDSIZE")
+prev = mkconstint("__WORDSIZE1", "__WORDSIZE1", "M_WORDSIZE1")
 prev = mkconstint("__STACKITEMSIZE", "__STACKITEMSIZE", "M_STACKITEMSIZE")
 prev = mkconstint("VERSION", "VERSION", "M_VERSION")
 prev = mkconstint("F_HIDDEN", "__F_HIDDEN", "F_HIDDEN")

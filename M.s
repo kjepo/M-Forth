@@ -454,10 +454,13 @@ _CREATE:
   MOV     X7, X3
   STRB    W1, [X3], #1          ; *X3++ = length
 1:
+  CMP     X1, #0
+  B.EQ    2f
   LDRB    W2, [X0], #1		; *X3++ = *X0++ copy name
   STRB    W2, [X3], #1
   SUBS    X1, X1, #1
-  B.NE    1b
+  B       1b
+2:
   ADD     X3, X3, #M_WORDSIZE1
   AND     X3, X3, ~M_WORDSIZE1
   KLOAD   X2, var_LATEST
