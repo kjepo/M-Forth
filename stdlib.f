@@ -27,7 +27,7 @@
 ;
 
 : ':' [ CHAR : ] LITERAL ;
-: ';' [ CHAR : ] LITERAL ;
+: ';' [ CHAR ; ] LITERAL ;
 : '(' [ CHAR ( ] LITERAL ;
 : ')' [ CHAR ) ] LITERAL ;
 : '"' [ CHAR " ] LITERAL ;
@@ -270,13 +270,23 @@
 
 
 : NIP ( x y -- y ) SWAP DROP ;
+
 : TUCK ( x y -- y x y ) SWAP OVER ;
+
 : PICK ( x_u ... x_1 x_0 u -- x_u ... x_1 x_0 x_u )
   1+                 ( add one because of 'u' on the stack )
   __STACKITEMSIZE *  ( multiply by the word size )
   DSP@ +             ( add to the stack pointer )
   @                  ( and fetch )
 ;
+
+: ROLL ( x_u x_u-1 ... x_0 u -- x_u-1 ... x_0 x_u )
+  DUP IF
+    SWAP
+    >R 1- RECURSE R> SWAP EXIT
+  THEN
+  DROP
+;   
 
 
 
@@ -579,6 +589,7 @@
 \ TEST#6
 \ TEST#7
 
+
 ( -------------------- CONSTANTS AND VARIABLES --------------------
 
   In FORTH, global constants and variables are defined like this:
@@ -777,7 +788,7 @@ VARIABLE X
     +------+---+---+---+---+--------+-----+---------+------+
     | LINK | 3 | V | A | L | DOCOL  | LIT | <value> | EXIT |
     +------+---+---+---+---+--------+-----+---------+------+
-               len          codeword
+                len         codeword
 
  In other words, this is a kind of self-modifying code.
 
@@ -943,6 +954,11 @@ VARIABLE X
 )
 
 : DUMP                  ( addr len -- )
+  16 + 15 INVERT AND           ( align to nearest 16 byte boundary )
+  SWAP 		
+  16 + 15 INVERT AND           ( align to nearest 16 byte boundary )
+  SWAP     
+
   BASE @ -ROT           ( save the current BASE at the bottom of the stack )
   HEX                   ( and switch to hexadecimal mode )
   BEGIN
@@ -1721,6 +1737,11 @@ VARIABLE X
   SYSCALL1
 ;
 
+: ABORT" IMMEDIATE
+  [COMPILE] ."
+  ' BYE ,
+;
+
 ( UNUSED returns the number of cells remaining in the user memory
   (data segment). The system call brk(2) is no longer used in Mac OS X so
   memory is currently allocated in a large chunk, governed by the
@@ -1846,6 +1867,22 @@ VARIABLE FD
   DOES> isn't possible to implement with this FORTH because we don't have a
   separate data pointer.
 )
+
+( -------------------- Math -------------------- )
+
+( Square root - result is truncated to an integer )
+( i -- sqrt(i) ) 
+: sqrt-closer  2DUP / OVER - 2 / ;
+: SQRT
+  DUP 0< IF
+    ." SQRT: " . CR
+    EXIT
+  THEN
+  DUP 0> IF	( don't need to run sqrt(0) )
+    1 BEGIN sqrt-closer DUP WHILE + REPEAT DROP NIP
+  THEN
+;
+
 
 ( -------------------- WELCOME MESSAGE -------------------- 
 
